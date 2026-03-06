@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug OpenFang Daemon",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/openfang.exe",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "environment": [
+        { "name": "RUST_BACKTRACE", "value": "1" },
+        { "name": "RUST_LOG", "value": "debug" }
+      ],
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
+}

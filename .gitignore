@@ -38,7 +38,7 @@ Thumbs.db
 
 # IDE & tools
 .idea/
-.vscode/
+# .vscode/
 .claude/
 *.swp
 *.swo
