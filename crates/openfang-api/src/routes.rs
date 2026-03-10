@@ -5222,8 +5222,8 @@ pub async fn get_model(
 
 /// GET /api/providers — List all providers with auth status.
 ///
-/// For local providers (ollama, vllm, lmstudio), also probes reachability and
-/// discovers available models via their health endpoints.
+/// For local providers (ollama, vllm, lmstudio), probes reachability only when
+/// the provider has an explicit URL override in `provider_urls`.
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let provider_list: Vec<openfang_types::model_catalog::ProviderInfo> = {
         let catalog = state
@@ -5247,21 +5247,30 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
             "base_url": p.base_url,
         });
 
-        // For local providers, add reachability info via health probe
+        // For local providers, probe only when explicitly configured in provider_urls.
+        // This avoids long waits when local runtimes are not installed/running.
         if !p.key_required {
             entry["is_local"] = serde_json::json!(true);
-            let probe = openfang_runtime::provider_health::probe_provider(&p.id, &p.base_url).await;
-            entry["reachable"] = serde_json::json!(probe.reachable);
-            entry["latency_ms"] = serde_json::json!(probe.latency_ms);
-            if !probe.discovered_models.is_empty() {
-                entry["discovered_models"] = serde_json::json!(probe.discovered_models);
-                // Merge discovered models into the catalog so agents can use them
-                if let Ok(mut catalog) = state.kernel.model_catalog.write() {
-                    catalog.merge_discovered_models(&p.id, &probe.discovered_models);
+            let should_probe_local = state.kernel.config.provider_urls.contains_key(&p.id);
+            if should_probe_local {
+                let probe =
+                    openfang_runtime::provider_health::probe_provider(&p.id, &p.base_url).await;
+                entry["reachable"] = serde_json::json!(probe.reachable);
+                entry["latency_ms"] = serde_json::json!(probe.latency_ms);
+                if !probe.discovered_models.is_empty() {
+                    entry["discovered_models"] = serde_json::json!(probe.discovered_models);
+                    // Merge discovered models into the catalog so agents can use them
+                    if let Ok(mut catalog) = state.kernel.model_catalog.write() {
+                        catalog.merge_discovered_models(&p.id, &probe.discovered_models);
+                    }
                 }
-            }
-            if let Some(err) = &probe.error {
-                entry["error"] = serde_json::json!(err);
+                if let Some(err) = &probe.error {
+                    entry["error"] = serde_json::json!(err);
+                }
+            } else {
+                entry["reachable"] = serde_json::json!(false);
+                entry["latency_ms"] = serde_json::Value::Null;
+                entry["probe_skipped"] = serde_json::json!(true);
             }
         }
 

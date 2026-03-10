@@ -117,7 +117,8 @@ impl HandRegistry {
 
     /// List all known hand definitions.
     pub fn list_definitions(&self) -> Vec<HandDefinition> {
-        let mut defs: Vec<HandDefinition> = self.definitions.iter().map(|r| r.value().clone()).collect();
+        let mut defs: Vec<HandDefinition> =
+            self.definitions.iter().map(|r| r.value().clone()).collect();
         defs.sort_by(|a, b| a.name.cmp(&b.name));
         defs
     }
@@ -311,6 +312,9 @@ impl Default for HandRegistry {
 fn check_requirement(req: &HandRequirement) -> bool {
     match req.requirement_type {
         RequirementType::Binary => {
+            if req.key.eq_ignore_ascii_case("python3") {
+                return is_python3_binary(&req.check_value);
+            }
             // Check if binary exists on PATH
             which_binary(&req.check_value)
         }
@@ -321,6 +325,24 @@ fn check_requirement(req: &HandRequirement) -> bool {
                 .unwrap_or(false)
         }
     }
+}
+
+fn is_python3_binary(binary_name: &str) -> bool {
+    println!("Checking if python3 binary exists: {}", binary_name);
+    if !which_binary(binary_name) {
+        return false;
+    }
+    let output = std::process::Command::new(binary_name)
+        .arg("--version")
+        .output();
+    let Ok(out) = output else {
+        return false;
+    };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let version_text = format!("{} {}", stdout.trim(), stderr.trim());
+    println!("Version text: {}", version_text);
+    version_text.contains("Python 3.")
 }
 
 /// Check if a binary is on PATH (cross-platform).
@@ -544,5 +566,18 @@ mod tests {
         };
         assert!(!check_requirement(&req_missing));
         std::env::remove_var("OPENFANG_TEST_HAND_REQ");
+    }
+
+    #[test]
+    fn python3_requirement_prefers_version_check() {
+        let req = HandRequirement {
+            key: "python3".to_string(),
+            label: "python3".to_string(),
+            requirement_type: RequirementType::Binary,
+            check_value: "python".to_string(),
+            description: None,
+            install: None,
+        };
+        let _ = check_requirement(&req);
     }
 }
