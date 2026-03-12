@@ -203,7 +203,7 @@ fn convert_messages(oai_messages: &[OaiMessage]) -> Vec<Message> {
                         .iter()
                         .filter_map(|part| match part {
                             OaiContentPart::Text { text } => {
-                                Some(ContentBlock::Text { text: text.clone() })
+                                Some(ContentBlock::Text { text: text.clone(), provider_metadata: None })
                             }
                             OaiContentPart::ImageUrl { image_url } => {
                                 // Parse data URI: data:{media_type};base64,{data}
@@ -335,7 +335,7 @@ pub async fn chat_completions(
                     index: 0,
                     message: ChoiceMessage {
                         role: "assistant",
-                        content: Some(result.response),
+                        content: Some(crate::ws::strip_think_tags(&result.response)),
                         tool_calls: None,
                     },
                     finish_reason: "stop",

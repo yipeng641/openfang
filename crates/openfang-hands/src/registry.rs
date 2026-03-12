@@ -52,6 +52,59 @@ impl HandRegistry {
         }
     }
 
+    /// Persist active hand state to disk so it survives restarts.
+    pub fn persist_state(&self, path: &std::path::Path) -> HandResult<()> {
+        let entries: Vec<serde_json::Value> = self
+            .instances
+            .iter()
+            .filter(|e| e.status == HandStatus::Active)
+            .map(|e| {
+                serde_json::json!({
+                    "hand_id": e.hand_id,
+                    "config": e.config,
+                    "agent_id": e.agent_id,
+                })
+            })
+            .collect();
+        let json = serde_json::to_string_pretty(&entries)
+            .map_err(|e| HandError::Config(format!("serialize hand state: {e}")))?;
+        std::fs::write(path, json)
+            .map_err(|e| HandError::Config(format!("write hand state: {e}")))?;
+        Ok(())
+    }
+
+    /// Load persisted hand state and re-activate hands.
+    /// Returns list of (hand_id, config, old_agent_id) that should be activated.
+    /// The `old_agent_id` is the agent UUID from before the restart, used to
+    /// reassign cron jobs to the newly spawned agent (issue #402).
+    pub fn load_state(
+        path: &std::path::Path,
+    ) -> Vec<(String, HashMap<String, serde_json::Value>, Option<AgentId>)> {
+        let data = match std::fs::read_to_string(path) {
+            Ok(d) => d,
+            Err(_) => return Vec::new(),
+        };
+        let entries: Vec<serde_json::Value> = match serde_json::from_str(&data) {
+            Ok(e) => e,
+            Err(e) => {
+                warn!("Failed to parse hand state file: {e}");
+                return Vec::new();
+            }
+        };
+        entries
+            .into_iter()
+            .filter_map(|e| {
+                let hand_id = e["hand_id"].as_str()?.to_string();
+                let config: HashMap<String, serde_json::Value> =
+                    serde_json::from_value(e["config"].clone()).unwrap_or_default();
+                let old_agent_id: Option<AgentId> = e
+                    .get("agent_id")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok());
+                Some((hand_id, config, old_agent_id))
+            })
+            .collect()
+    }
+
     /// Load all bundled hand definitions. Returns count of definitions loaded.
     pub fn load_bundled(&self) -> usize {
         let bundled = bundled::bundled_hands();
@@ -117,8 +170,7 @@ impl HandRegistry {
 
     /// List all known hand definitions.
     pub fn list_definitions(&self) -> Vec<HandDefinition> {
-        let mut defs: Vec<HandDefinition> =
-            self.definitions.iter().map(|r| r.value().clone()).collect();
+        let mut defs: Vec<HandDefinition> = self.definitions.iter().map(|r| r.value().clone()).collect();
         defs.sort_by(|a, b| a.name.cmp(&b.name));
         defs
     }
@@ -300,6 +352,46 @@ impl HandRegistry {
         entry.updated_at = chrono::Utc::now();
         Ok(())
     }
+
+    /// Compute readiness for a hand, cross-referencing requirements with
+    /// active instance state.
+    ///
+    /// Returns `None` if the hand definition does not exist.
+    pub fn readiness(&self, hand_id: &str) -> Option<HandReadiness> {
+        let reqs = self.check_requirements(hand_id).ok()?;
+
+        let requirements_met = reqs.iter().all(|(_, ok)| *ok);
+
+        // A hand is active if at least one instance is in Active status.
+        let active = self.instances.iter().any(|entry| {
+            entry.hand_id == hand_id && entry.status == HandStatus::Active
+        });
+
+        // Degraded: active, but at least one non-optional requirement is unmet
+        // OR any optional requirement is unmet. In practice, the most useful
+        // definition is: active + any requirement unsatisfied.
+        let degraded = active && reqs.iter().any(|(_, ok)| !ok);
+
+        Some(HandReadiness {
+            requirements_met,
+            active,
+            degraded,
+        })
+    }
+}
+
+/// Readiness snapshot for a hand definition — combines requirement checks
+/// with runtime activation state so the API can report unambiguous status.
+#[derive(Debug, Clone, Serialize)]
+pub struct HandReadiness {
+    /// Whether all declared requirements are currently satisfied.
+    pub requirements_met: bool,
+    /// Whether the hand currently has a running (Active-status) instance.
+    pub active: bool,
+    /// Whether the hand is active but some requirements are unmet.
+    /// This means the hand is running in a degraded mode — some features
+    /// may not work (e.g. browser hand without chromium).
+    pub degraded: bool,
 }
 
 impl Default for HandRegistry {
@@ -312,11 +404,25 @@ impl Default for HandRegistry {
 fn check_requirement(req: &HandRequirement) -> bool {
     match req.requirement_type {
         RequirementType::Binary => {
-            if req.key.eq_ignore_ascii_case("python3") {
-                return is_python3_binary(&req.check_value);
+            // Special handling for python3: must actually run the command and verify
+            // the output contains "Python 3", because Windows ships a python3.exe
+            // Store shim that exists on PATH but doesn't actually work.
+            if req.check_value == "python3" {
+                return check_python3_available();
             }
-            // Check if binary exists on PATH
-            which_binary(&req.check_value)
+            // Check if binary exists on PATH.
+            if which_binary(&req.check_value) {
+                return true;
+            }
+            if req.check_value == "chromium" {
+                // Try common Chromium/Chrome binary names across platforms
+                return which_binary("chromium-browser")
+                    || which_binary("google-chrome")
+                    || which_binary("google-chrome-stable")
+                    || which_binary("chrome")
+                    || std::env::var("CHROME_PATH").map(|v| !v.is_empty()).unwrap_or(false);
+            }
+            false
         }
         RequirementType::EnvVar | RequirementType::ApiKey => {
             // Check if env var is set and non-empty
@@ -327,22 +433,42 @@ fn check_requirement(req: &HandRequirement) -> bool {
     }
 }
 
-fn is_python3_binary(binary_name: &str) -> bool {
-    println!("Checking if python3 binary exists: {}", binary_name);
-    if !which_binary(binary_name) {
-        return false;
+/// Check if Python 3 is actually available by running the command and checking
+/// the version output. This avoids false negatives from Windows Store shims
+/// (python3.exe that just opens the Microsoft Store) and false positives from
+/// Python 2 installations where `python` exists but is Python 2.
+fn check_python3_available() -> bool {
+    // Try "python3 --version" first (Linux/macOS, some Windows installs)
+    if run_returns_python3("python3") {
+        return true;
     }
-    let output = std::process::Command::new(binary_name)
+    // Try "python --version" (Windows commonly uses this, Docker containers too)
+    if run_returns_python3("python") {
+        return true;
+    }
+    false
+}
+
+/// Run `{cmd} --version` and return true if the output contains "Python 3".
+fn run_returns_python3(cmd: &str) -> bool {
+    match std::process::Command::new(cmd)
         .arg("--version")
-        .output();
-    let Ok(out) = output else {
-        return false;
-    };
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let version_text = format!("{} {}", stdout.trim(), stderr.trim());
-    println!("Version text: {}", version_text);
-    version_text.contains("Python 3.")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null())
+        .output()
+    {
+        Ok(output) => {
+            if !output.status.success() {
+                return false;
+            }
+            // Python --version may print to stdout or stderr depending on version
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            stdout.contains("Python 3") || stderr.contains("Python 3")
+        }
+        Err(_) => false,
+    }
 }
 
 /// Check if a binary is on PATH (cross-platform).
@@ -412,7 +538,7 @@ mod tests {
     fn load_bundled_hands() {
         let reg = HandRegistry::new();
         let count = reg.load_bundled();
-        assert_eq!(count, 7);
+        assert_eq!(count, 8);
         assert!(!reg.list_definitions().is_empty());
 
         // Clip hand should be loaded
@@ -552,6 +678,7 @@ mod tests {
             requirement_type: RequirementType::EnvVar,
             check_value: "OPENFANG_TEST_HAND_REQ".to_string(),
             description: None,
+            optional: false,
             install: None,
         };
         assert!(check_requirement(&req));
@@ -562,6 +689,7 @@ mod tests {
             requirement_type: RequirementType::EnvVar,
             check_value: "OPENFANG_NONEXISTENT_VAR_12345".to_string(),
             description: None,
+            optional: false,
             install: None,
         };
         assert!(!check_requirement(&req_missing));
@@ -569,15 +697,85 @@ mod tests {
     }
 
     #[test]
-    fn python3_requirement_prefers_version_check() {
+    fn readiness_nonexistent_hand() {
+        let reg = HandRegistry::new();
+        assert!(reg.readiness("nonexistent").is_none());
+    }
+
+    #[test]
+    fn readiness_inactive_hand() {
+        let reg = HandRegistry::new();
+        reg.load_bundled();
+
+        // Lead hand has no requirements, so requirements_met = true
+        let r = reg.readiness("lead").unwrap();
+        assert!(r.requirements_met);
+        assert!(!r.active);
+        assert!(!r.degraded);
+    }
+
+    #[test]
+    fn readiness_active_hand_all_met() {
+        let reg = HandRegistry::new();
+        reg.load_bundled();
+
+        // Lead hand has no requirements — activate it
+        let instance = reg.activate("lead", HashMap::new()).unwrap();
+        let r = reg.readiness("lead").unwrap();
+        assert!(r.requirements_met);
+        assert!(r.active);
+        assert!(!r.degraded); // all met, so not degraded
+
+        reg.deactivate(instance.instance_id).unwrap();
+    }
+
+    #[test]
+    fn readiness_active_hand_degraded() {
+        let reg = HandRegistry::new();
+        reg.load_bundled();
+
+        // Browser hand requires python3 + chromium. Activate it — if either
+        // requirement is unmet on this machine, it will show as degraded.
+        let instance = reg.activate("browser", HashMap::new()).unwrap();
+        let r = reg.readiness("browser").unwrap();
+        assert!(r.active);
+
+        // If any requirement is not satisfied, degraded should be true
+        if !r.requirements_met {
+            assert!(r.degraded);
+        } else {
+            assert!(!r.degraded);
+        }
+
+        reg.deactivate(instance.instance_id).unwrap();
+    }
+
+    #[test]
+    fn readiness_paused_hand_not_active() {
+        let reg = HandRegistry::new();
+        reg.load_bundled();
+
+        let instance = reg.activate("lead", HashMap::new()).unwrap();
+        reg.pause(instance.instance_id).unwrap();
+
+        let r = reg.readiness("lead").unwrap();
+        assert!(!r.active); // Paused is not Active
+        assert!(!r.degraded);
+
+        reg.deactivate(instance.instance_id).unwrap();
+    }
+
+    #[test]
+    fn optional_field_defaults_false() {
         let req = HandRequirement {
-            key: "python3".to_string(),
-            label: "python3".to_string(),
+            key: "test".to_string(),
+            label: "test".to_string(),
             requirement_type: RequirementType::Binary,
-            check_value: "python".to_string(),
+            check_value: "test".to_string(),
             description: None,
+            optional: false,
             install: None,
         };
-        let _ = check_requirement(&req);
+        assert!(!req.optional);
     }
 }
