@@ -73,14 +73,18 @@ pub async fn spawn_agent(
                 Err(_) => {
                     return (
                         StatusCode::NOT_FOUND,
-                        Json(serde_json::json!({"error": format!("Template '{}' not found", safe_name)})),
+                        Json(
+                            serde_json::json!({"error": format!("Template '{}' not found", safe_name)}),
+                        ),
                     );
                 }
             }
         } else {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "Either 'manifest_toml' or 'template' is required"})),
+                Json(
+                    serde_json::json!({"error": "Either 'manifest_toml' or 'template' is required"}),
+                ),
             );
         }
     } else {
@@ -170,15 +174,13 @@ pub async fn list_agents(State(state): State<Arc<AppState>>) -> impl IntoRespons
         .into_iter()
         .map(|e| {
             // Resolve "default" provider/model to actual kernel defaults
-            let provider = if e.manifest.model.provider.is_empty()
-                || e.manifest.model.provider == "default"
-            {
-                dm.provider.as_str()
-            } else {
-                e.manifest.model.provider.as_str()
-            };
-            let model = if e.manifest.model.model.is_empty()
-                || e.manifest.model.model == "default"
+            let provider =
+                if e.manifest.model.provider.is_empty() || e.manifest.model.provider == "default" {
+                    dm.provider.as_str()
+                } else {
+                    e.manifest.model.provider.as_str()
+                };
+            let model = if e.manifest.model.model.is_empty() || e.manifest.model.model == "default"
             {
                 dm.model.as_str()
             } else {
@@ -464,20 +466,19 @@ pub async fn get_agent_session(
                                     // Persist image to upload dir so it can be
                                     // served back when loading session history.
                                     let file_id = uuid::Uuid::new_v4().to_string();
-                                    let upload_dir =
-                                        std::env::temp_dir().join("openfang_uploads");
+                                    let upload_dir = std::env::temp_dir().join("openfang_uploads");
                                     let _ = std::fs::create_dir_all(&upload_dir);
                                     if let Ok(bytes) =
                                         base64::engine::general_purpose::STANDARD.decode(data)
                                     {
-                                        let _ = std::fs::write(
-                                            upload_dir.join(&file_id),
-                                            &bytes,
-                                        );
+                                        let _ = std::fs::write(upload_dir.join(&file_id), &bytes);
                                         UPLOAD_REGISTRY.insert(
                                             file_id.clone(),
                                             UploadMeta {
-                                                filename: format!("image.{}", media_type.rsplit('/').next().unwrap_or("png")),
+                                                filename: format!(
+                                                    "image.{}",
+                                                    media_type.rsplit('/').next().unwrap_or("png")
+                                                ),
                                                 content_type: media_type.clone(),
                                             },
                                         );
@@ -501,8 +502,7 @@ pub async fn get_agent_session(
                                         "expanded": false,
                                     }));
                                     // Will be filled after this loop when we know msg_idx
-                                    tool_use_index
-                                        .insert(id.clone(), (usize::MAX, tool_idx));
+                                    tool_use_index.insert(id.clone(), (usize::MAX, tool_idx));
                                 }
                                 // ToolResult blocks are handled in pass 2
                                 openfang_types::message::ContentBlock::ToolResult { .. } => {}
@@ -547,9 +547,7 @@ pub async fn get_agent_session(
                             ..
                         } = b
                         {
-                            if let Some(&(msg_idx, tool_idx)) =
-                                tool_use_index.get(tool_use_id)
-                            {
+                            if let Some(&(msg_idx, tool_idx)) = tool_use_index.get(tool_use_id) {
                                 if let Some(msg) = built_messages.get_mut(msg_idx) {
                                     if let Some(tools_arr) =
                                         msg.get_mut("tools").and_then(|v| v.as_array_mut())
@@ -557,8 +555,7 @@ pub async fn get_agent_session(
                                         if let Some(tool_obj) = tools_arr.get_mut(tool_idx) {
                                             let preview: String =
                                                 result.chars().take(2000).collect();
-                                            tool_obj["result"] =
-                                                serde_json::Value::String(preview);
+                                            tool_obj["result"] = serde_json::Value::String(preview);
                                             tool_obj["is_error"] =
                                                 serde_json::Value::Bool(*is_error);
                                         }
@@ -1990,9 +1987,7 @@ fn build_field_json(
                     val.clone()
                 };
                 field["value"] = display_val;
-                if !val.is_null()
-                    && val.as_str().map(|s| !s.is_empty()).unwrap_or(true)
-                {
+                if !val.is_null() && val.as_str().map(|s| !s.is_empty()).unwrap_or(true) {
                     field["has_value"] = serde_json::Value::Bool(true);
                 }
             }
@@ -2012,46 +2007,166 @@ fn channel_config_values(
     name: &str,
 ) -> Option<serde_json::Value> {
     match name {
-        "telegram" => config.telegram.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "discord" => config.discord.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "slack" => config.slack.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "whatsapp" => config.whatsapp.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "signal" => config.signal.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "matrix" => config.matrix.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "email" => config.email.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "teams" => config.teams.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "mattermost" => config.mattermost.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "irc" => config.irc.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "google_chat" => config.google_chat.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "twitch" => config.twitch.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "rocketchat" => config.rocketchat.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "zulip" => config.zulip.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "xmpp" => config.xmpp.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "line" => config.line.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "viber" => config.viber.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "messenger" => config.messenger.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "reddit" => config.reddit.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "mastodon" => config.mastodon.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "bluesky" => config.bluesky.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "feishu" => config.feishu.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "revolt" => config.revolt.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "nextcloud" => config.nextcloud.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "guilded" => config.guilded.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "keybase" => config.keybase.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "threema" => config.threema.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "nostr" => config.nostr.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "webex" => config.webex.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "pumble" => config.pumble.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "flock" => config.flock.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "twist" => config.twist.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "mumble" => config.mumble.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "dingtalk" => config.dingtalk.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "discourse" => config.discourse.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "gitter" => config.gitter.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "ntfy" => config.ntfy.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "gotify" => config.gotify.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "webhook" => config.webhook.as_ref().and_then(|c| serde_json::to_value(c).ok()),
-        "linkedin" => config.linkedin.as_ref().and_then(|c| serde_json::to_value(c).ok()),
+        "telegram" => config
+            .telegram
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "discord" => config
+            .discord
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "slack" => config
+            .slack
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "whatsapp" => config
+            .whatsapp
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "signal" => config
+            .signal
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "matrix" => config
+            .matrix
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "email" => config
+            .email
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "teams" => config
+            .teams
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "mattermost" => config
+            .mattermost
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "irc" => config
+            .irc
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "google_chat" => config
+            .google_chat
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "twitch" => config
+            .twitch
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "rocketchat" => config
+            .rocketchat
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "zulip" => config
+            .zulip
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "xmpp" => config
+            .xmpp
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "line" => config
+            .line
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "viber" => config
+            .viber
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "messenger" => config
+            .messenger
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "reddit" => config
+            .reddit
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "mastodon" => config
+            .mastodon
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "bluesky" => config
+            .bluesky
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "feishu" => config
+            .feishu
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "revolt" => config
+            .revolt
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "nextcloud" => config
+            .nextcloud
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "guilded" => config
+            .guilded
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "keybase" => config
+            .keybase
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "threema" => config
+            .threema
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "nostr" => config
+            .nostr
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "webex" => config
+            .webex
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "pumble" => config
+            .pumble
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "flock" => config
+            .flock
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "twist" => config
+            .twist
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "mumble" => config
+            .mumble
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "dingtalk" => config
+            .dingtalk
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "discourse" => config
+            .discourse
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "gitter" => config
+            .gitter
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "ntfy" => config
+            .ntfy
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "gotify" => config
+            .gotify
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "webhook" => config
+            .webhook
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
+        "linkedin" => config
+            .linkedin
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok()),
         _ => None,
     }
 }
@@ -2173,7 +2288,10 @@ pub async fn configure_channel(
             );
         } else {
             // Config field — collect for TOML write with type info
-            config_fields.insert(field_def.key.to_string(), (value.to_string(), field_def.field_type));
+            config_fields.insert(
+                field_def.key.to_string(),
+                (value.to_string(), field_def.field_type),
+            );
         }
     }
 
@@ -3177,7 +3295,9 @@ pub async fn clawhub_search(
                 "items": items,
                 "next_cursor": null,
             });
-            state.clawhub_cache.insert(cache_key, (Instant::now(), resp.clone()));
+            state
+                .clawhub_cache
+                .insert(cache_key, (Instant::now(), resp.clone()));
             (StatusCode::OK, Json(resp))
         }
         Err(e) => {
@@ -3190,9 +3310,7 @@ pub async fn clawhub_search(
             };
             (
                 status,
-                Json(
-                    serde_json::json!({"items": [], "next_cursor": null, "error": msg}),
-                ),
+                Json(serde_json::json!({"items": [], "next_cursor": null, "error": msg})),
             )
         }
     }
@@ -3245,7 +3363,9 @@ pub async fn clawhub_browse(
                 "items": items,
                 "next_cursor": results.next_cursor,
             });
-            state.clawhub_cache.insert(cache_key, (Instant::now(), resp.clone()));
+            state
+                .clawhub_cache
+                .insert(cache_key, (Instant::now(), resp.clone()));
             (StatusCode::OK, Json(resp))
         }
         Err(e) => {
@@ -3258,9 +3378,7 @@ pub async fn clawhub_browse(
             };
             (
                 status,
-                Json(
-                    serde_json::json!({"items": [], "next_cursor": null, "error": msg}),
-                ),
+                Json(serde_json::json!({"items": [], "next_cursor": null, "error": msg})),
             )
         }
     }
@@ -3490,7 +3608,10 @@ pub async fn list_hands(State(state): State<Arc<AppState>>) -> impl IntoResponse
                 .check_requirements(&d.id)
                 .unwrap_or_default();
             let readiness = state.kernel.hand_registry.readiness(&d.id);
-            let requirements_met = readiness.as_ref().map(|r| r.requirements_met).unwrap_or(false);
+            let requirements_met = readiness
+                .as_ref()
+                .map(|r| r.requirements_met)
+                .unwrap_or(false);
             let active = readiness.as_ref().map(|r| r.active).unwrap_or(false);
             let degraded = readiness.as_ref().map(|r| r.degraded).unwrap_or(false);
             serde_json::json!({
@@ -3553,7 +3674,10 @@ pub async fn get_hand(
                 .check_requirements(&hand_id)
                 .unwrap_or_default();
             let readiness = state.kernel.hand_registry.readiness(&hand_id);
-            let requirements_met = readiness.as_ref().map(|r| r.requirements_met).unwrap_or(false);
+            let requirements_met = readiness
+                .as_ref()
+                .map(|r| r.requirements_met)
+                .unwrap_or(false);
             let active = readiness.as_ref().map(|r| r.active).unwrap_or(false);
             let degraded = readiness.as_ref().map(|r| r.degraded).unwrap_or(false);
             let settings_status = state
@@ -3630,7 +3754,10 @@ pub async fn check_hand_deps(
                 .check_requirements(&hand_id)
                 .unwrap_or_default();
             let readiness = state.kernel.hand_registry.readiness(&hand_id);
-            let requirements_met = readiness.as_ref().map(|r| r.requirements_met).unwrap_or(false);
+            let requirements_met = readiness
+                .as_ref()
+                .map(|r| r.requirements_met)
+                .unwrap_or(false);
             let active = readiness.as_ref().map(|r| r.active).unwrap_or(false);
             let degraded = readiness.as_ref().map(|r| r.degraded).unwrap_or(false);
             (
@@ -3953,7 +4080,12 @@ pub async fn activate_hand(
             // If the hand agent has a non-reactive schedule (autonomous hands),
             // start its background loop so it begins running immediately.
             if let Some(agent_id) = instance.agent_id {
-                let entry = state.kernel.registry.list().into_iter().find(|e| e.id == agent_id);
+                let entry = state
+                    .kernel
+                    .registry
+                    .list()
+                    .into_iter()
+                    .find(|e| e.id == agent_id);
                 if let Some(entry) = entry {
                     if !matches!(
                         entry.manifest.schedule,
@@ -4109,7 +4241,9 @@ pub async fn update_hand_settings(
         },
         None => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": format!("No active instance for hand: {hand_id}. Activate the hand first.")})),
+            Json(
+                serde_json::json!({"error": format!("No active instance for hand: {hand_id}. Activate the hand first.")}),
+            ),
         ),
     }
 }
@@ -4246,7 +4380,10 @@ pub async fn hand_instance_browser(
                 content = data["content"].as_str().unwrap_or("").to_string();
                 // Truncate content to avoid huge payloads (UTF-8 safe)
                 if content.len() > 2000 {
-                    content = format!("{}... (truncated)", openfang_types::truncate_str(&content, 2000));
+                    content = format!(
+                        "{}... (truncated)",
+                        openfang_types::truncate_str(&content, 2000)
+                    );
                 }
             }
         }
@@ -4916,7 +5053,9 @@ pub async fn update_agent_budget(
     if hourly.is_none() && daily.is_none() && monthly.is_none() && tokens.is_none() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "Provide at least one of: max_cost_per_hour_usd, max_cost_per_day_usd, max_cost_per_month_usd, max_llm_tokens_per_hour"})),
+            Json(
+                serde_json::json!({"error": "Provide at least one of: max_cost_per_hour_usd, max_cost_per_day_usd, max_cost_per_month_usd, max_llm_tokens_per_hour"}),
+            ),
         );
     }
 
@@ -5208,7 +5347,10 @@ pub async fn patch_agent(
     }
     if let Some(model) = body.get("model").and_then(|v| v.as_str()) {
         let explicit_provider = body.get("provider").and_then(|v| v.as_str());
-        if let Err(e) = state.kernel.set_agent_model(agent_id, model, explicit_provider) {
+        if let Err(e) = state
+            .kernel
+            .set_agent_model(agent_id, model, explicit_provider)
+        {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({"error": format!("{e}")})),
@@ -5233,7 +5375,9 @@ pub async fn patch_agent(
         let _ = state.kernel.memory.save_agent(&entry);
         (
             StatusCode::OK,
-            Json(serde_json::json!({"status": "ok", "agent_id": entry.id.to_string(), "name": entry.name})),
+            Json(
+                serde_json::json!({"status": "ok", "agent_id": entry.id.to_string(), "name": entry.name}),
+            ),
         )
     } else {
         (
@@ -5637,6 +5781,7 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
             "key_required": p.key_required,
             "api_key_env": p.api_key_env,
             "base_url": p.base_url,
+            "protocol_type": p.protocol_type,
         });
 
         // For local providers, attach the probe result
@@ -5751,7 +5896,9 @@ pub async fn add_custom_model(
     if !catalog.add_custom_model(entry) {
         return (
             StatusCode::CONFLICT,
-            Json(serde_json::json!({"error": format!("Model '{}' already exists for provider '{}'", id, provider)})),
+            Json(
+                serde_json::json!({"error": format!("Model '{}' already exists for provider '{}'", id, provider)}),
+            ),
         );
     }
 
@@ -6456,7 +6603,10 @@ pub async fn set_model(
         }
     };
     let explicit_provider = body["provider"].as_str();
-    match state.kernel.set_agent_model(agent_id, model, explicit_provider) {
+    match state
+        .kernel
+        .set_agent_model(agent_id, model, explicit_provider)
+    {
         Ok(()) => {
             // Return the resolved model+provider so frontend stays in sync.
             // The model name may have been normalized (provider prefix stripped),
@@ -6465,11 +6615,18 @@ pub async fn set_model(
                 .kernel
                 .registry
                 .get(agent_id)
-                .map(|e| (e.manifest.model.model.clone(), e.manifest.model.provider.clone()))
+                .map(|e| {
+                    (
+                        e.manifest.model.model.clone(),
+                        e.manifest.model.provider.clone(),
+                    )
+                })
                 .unwrap_or_else(|| (model.to_string(), String::new()));
             (
                 StatusCode::OK,
-                Json(serde_json::json!({"status": "ok", "model": resolved_model, "provider": resolved_provider})),
+                Json(
+                    serde_json::json!({"status": "ok", "model": resolved_model, "provider": resolved_provider}),
+                ),
             )
         }
         Err(e) => (
@@ -6554,10 +6711,7 @@ pub async fn set_agent_tools(
         .kernel
         .set_agent_tool_filters(agent_id, allowlist, blocklist)
     {
-        Ok(()) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"status": "ok"})),
-        ),
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({"status": "ok"}))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("{e}")})),
@@ -6767,10 +6921,7 @@ pub async fn set_provider_key(
             .map(|p| p.api_key_env.clone())
             .unwrap_or_else(|| {
                 // Custom provider — derive env var: MY_PROVIDER → MY_PROVIDER_API_KEY
-                format!(
-                    "{}_API_KEY",
-                    name.to_uppercase().replace('-', "_")
-                )
+                format!("{}_API_KEY", name.to_uppercase().replace('-', "_"))
             })
     };
 
@@ -6826,7 +6977,11 @@ pub async fn set_provider_key(
     let switched = if !current_has_key && current_provider != name {
         // Find a default model for the newly-keyed provider
         let default_model = {
-            let catalog = state.kernel.model_catalog.read().unwrap_or_else(|e| e.into_inner());
+            let catalog = state
+                .kernel
+                .model_catalog
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
             catalog.default_model_for_provider(&name)
         };
         if let Some(model_id) = default_model {
@@ -6839,7 +6994,8 @@ pub async fn set_provider_key(
             if let Ok(existing) = std::fs::read_to_string(&config_path) {
                 // Remove existing [default_model] section if present, then append
                 let cleaned = remove_toml_section(&existing, "default_model");
-                let _ = std::fs::write(&config_path, format!("{}\n{}", cleaned.trim(), update_toml));
+                let _ =
+                    std::fs::write(&config_path, format!("{}\n{}", cleaned.trim(), update_toml));
             } else {
                 let _ = std::fs::write(&config_path, update_toml);
             }
@@ -6901,9 +7057,10 @@ pub async fn set_provider_key(
     let mut resp = serde_json::json!({"status": "saved", "provider": name});
     if switched {
         resp["switched_default"] = serde_json::json!(true);
-        resp["message"] = serde_json::json!(
-            format!("API key saved and default provider switched to '{}'.", name)
-        );
+        resp["message"] = serde_json::json!(format!(
+            "API key saved and default provider switched to '{}'.",
+            name
+        ));
     }
 
     (StatusCode::OK, Json(resp))
@@ -6967,7 +7124,7 @@ pub async fn test_provider(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
-    let (env_var, base_url, key_required, default_model) = {
+    let (env_var, base_url, key_required, default_model, protocol_type) = {
         let catalog = state
             .kernel
             .model_catalog
@@ -6984,6 +7141,7 @@ pub async fn test_provider(
                     p.base_url.clone(),
                     p.key_required,
                     model_id,
+                    p.protocol_type.clone(),
                 )
             }
             None => {
@@ -7008,6 +7166,7 @@ pub async fn test_provider(
     let start = std::time::Instant::now();
     let driver_config = openfang_runtime::llm_driver::DriverConfig {
         provider: name.clone(),
+        protocol_type: Some(protocol_type),
         api_key,
         base_url: if base_url.is_empty() {
             None
@@ -7087,6 +7246,13 @@ pub async fn set_provider_url(
         );
     }
 
+    let protocol_type = body
+        .get("protocol_type")
+        .and_then(|v| v.as_str())
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "openai".to_string());
+
     // Update catalog in memory
     {
         let mut catalog = state
@@ -7095,6 +7261,7 @@ pub async fn set_provider_url(
             .write()
             .unwrap_or_else(|e| e.into_inner());
         catalog.set_provider_url(&name, &base_url);
+        catalog.set_provider_protocol(&name, &protocol_type);
     }
 
     // Persist to config.toml [provider_urls] section
@@ -7105,10 +7272,24 @@ pub async fn set_provider_url(
             Json(serde_json::json!({"error": format!("Failed to save config: {e}")})),
         );
     }
+    if let Err(e) = upsert_provider_protocol(&config_path, &name, &protocol_type) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to save protocol: {e}")})),
+        );
+    }
 
-    // Probe reachability at the new URL
-    let probe =
-        openfang_runtime::provider_health::probe_provider(&name, &base_url).await;
+    // Probe reachability for OpenAI-compatible endpoints only.
+    let probe = if protocol_type == "openai" {
+        openfang_runtime::provider_health::probe_provider(&name, &base_url).await
+    } else {
+        openfang_runtime::provider_health::ProbeResult {
+            reachable: false,
+            latency_ms: 0,
+            discovered_models: Vec::new(),
+            error: None,
+        }
+    };
 
     // Merge discovered models into catalog
     if !probe.discovered_models.is_empty() {
@@ -7121,6 +7302,7 @@ pub async fn set_provider_url(
         "status": "saved",
         "provider": name,
         "base_url": base_url,
+        "protocol_type": protocol_type,
         "reachable": probe.reachable,
         "latency_ms": probe.latency_ms,
     });
@@ -7163,6 +7345,49 @@ fn upsert_provider_url(
         .ok_or("provider_urls is not a table")?;
 
     urls_table.insert(provider.to_string(), toml::Value::String(url.to_string()));
+
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    std::fs::write(config_path, toml::to_string_pretty(&doc)?)?;
+    Ok(())
+}
+
+fn upsert_provider_protocol(
+    config_path: &std::path::Path,
+    provider: &str,
+    protocol_type: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let content = if config_path.exists() {
+        std::fs::read_to_string(config_path)?
+    } else {
+        String::new()
+    };
+
+    let mut doc: toml::Value = if content.trim().is_empty() {
+        toml::Value::Table(toml::map::Map::new())
+    } else {
+        toml::from_str(&content)?
+    };
+
+    let root = doc.as_table_mut().ok_or("Config is not a TOML table")?;
+    if !root.contains_key("provider_protocols") {
+        root.insert(
+            "provider_protocols".to_string(),
+            toml::Value::Table(toml::map::Map::new()),
+        );
+    }
+
+    let protocols_table = root
+        .get_mut("provider_protocols")
+        .and_then(|value| value.as_table_mut())
+        .ok_or("provider_protocols is not a table")?;
+
+    protocols_table.insert(
+        provider.to_string(),
+        toml::Value::String(protocol_type.to_string()),
+    );
 
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -8002,7 +8227,11 @@ pub async fn run_schedule(
     );
 
     let kernel_handle: Arc<dyn KernelHandle> = state.kernel.clone() as Arc<dyn KernelHandle>;
-    match state.kernel.send_message_with_handle(target_agent, &run_message, Some(kernel_handle)).await {
+    match state
+        .kernel
+        .send_message_with_handle(target_agent, &run_message, Some(kernel_handle))
+        .await
+    {
         Ok(result) => (
             StatusCode::OK,
             Json(serde_json::json!({
@@ -8156,7 +8385,9 @@ pub async fn patch_agent_config(
         if name.len() > MAX_NAME_LEN {
             return (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                Json(serde_json::json!({"error": format!("Name exceeds max length ({MAX_NAME_LEN} chars)")})),
+                Json(
+                    serde_json::json!({"error": format!("Name exceeds max length ({MAX_NAME_LEN} chars)")}),
+                ),
             );
         }
     }
@@ -8164,7 +8395,9 @@ pub async fn patch_agent_config(
         if desc.len() > MAX_DESC_LEN {
             return (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                Json(serde_json::json!({"error": format!("Description exceeds max length ({MAX_DESC_LEN} chars)")})),
+                Json(
+                    serde_json::json!({"error": format!("Description exceeds max length ({MAX_DESC_LEN} chars)")}),
+                ),
             );
         }
     }
@@ -8172,7 +8405,9 @@ pub async fn patch_agent_config(
         if prompt.len() > MAX_PROMPT_LEN {
             return (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                Json(serde_json::json!({"error": format!("System prompt exceeds max length ({MAX_PROMPT_LEN} chars)")})),
+                Json(
+                    serde_json::json!({"error": format!("System prompt exceeds max length ({MAX_PROMPT_LEN} chars)")}),
+                ),
             );
         }
     }
@@ -9164,12 +9399,18 @@ pub async fn config_reload(State(state): State<Arc<AppState>>) -> impl IntoRespo
 // ---------------------------------------------------------------------------
 
 /// GET /api/config/schema — Return a simplified JSON description of the config structure.
-pub async fn config_schema(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn config_schema(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     // Build provider/model options from model catalog for dropdowns
-    let catalog = state.kernel.model_catalog.read().unwrap_or_else(|e| e.into_inner());
-    let provider_options: Vec<String> = catalog.list_providers().iter().map(|p| p.id.clone()).collect();
+    let catalog = state
+        .kernel
+        .model_catalog
+        .read()
+        .unwrap_or_else(|e| e.into_inner());
+    let provider_options: Vec<String> = catalog
+        .list_providers()
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
     let model_options: Vec<serde_json::Value> = catalog
         .list_models()
         .iter()
@@ -10023,8 +10264,7 @@ pub async fn copilot_oauth_start() -> impl IntoResponse {
                 CopilotFlowState {
                     device_code: resp.device_code,
                     interval: resp.interval,
-                    expires_at: Instant::now()
-                        + std::time::Duration::from_secs(resp.expires_in),
+                    expires_at: Instant::now() + std::time::Duration::from_secs(resp.expires_in),
                 },
             );
 
@@ -10088,7 +10328,9 @@ pub async fn copilot_oauth_poll(
             if let Err(e) = write_secret_env(&secrets_path, "GITHUB_TOKEN", &access_token) {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"status": "error", "error": format!("Failed to save token: {e}")})),
+                    Json(
+                        serde_json::json!({"status": "error", "error": format!("Failed to save token: {e}")}),
+                    ),
                 );
             }
 
@@ -10292,15 +10534,30 @@ fn audit_to_comms_event(
             // Format detail: "tokens_in=X, tokens_out=Y" → readable summary
             let detail = if entry.detail.starts_with("tokens_in=") {
                 let parts: Vec<&str> = entry.detail.split(", ").collect();
-                let in_tok = parts.first().and_then(|p| p.strip_prefix("tokens_in=")).unwrap_or("?");
-                let out_tok = parts.get(1).and_then(|p| p.strip_prefix("tokens_out=")).unwrap_or("?");
+                let in_tok = parts
+                    .first()
+                    .and_then(|p| p.strip_prefix("tokens_in="))
+                    .unwrap_or("?");
+                let out_tok = parts
+                    .get(1)
+                    .and_then(|p| p.strip_prefix("tokens_out="))
+                    .unwrap_or("?");
                 if entry.outcome == "ok" {
                     format!("{} in / {} out tokens", in_tok, out_tok)
                 } else {
-                    format!("{} in / {} out — {}", in_tok, out_tok, openfang_types::truncate_str(&entry.outcome, 80))
+                    format!(
+                        "{} in / {} out — {}",
+                        in_tok,
+                        out_tok,
+                        openfang_types::truncate_str(&entry.outcome, 80)
+                    )
                 }
             } else if entry.outcome != "ok" {
-                format!("{} — {}", openfang_types::truncate_str(&entry.detail, 80), openfang_types::truncate_str(&entry.outcome, 80))
+                format!(
+                    "{} — {}",
+                    openfang_types::truncate_str(&entry.detail, 80),
+                    openfang_types::truncate_str(&entry.outcome, 80)
+                )
             } else {
                 openfang_types::truncate_str(&entry.detail, 200).to_string()
             };
@@ -10308,12 +10565,18 @@ fn audit_to_comms_event(
         }
         "AgentSpawn" => (
             CommsEventKind::AgentSpawned,
-            format!("Agent spawned: {}", openfang_types::truncate_str(&entry.detail, 100)),
+            format!(
+                "Agent spawned: {}",
+                openfang_types::truncate_str(&entry.detail, 100)
+            ),
             "",
         ),
         "AgentKill" => (
             CommsEventKind::AgentTerminated,
-            format!("Agent killed: {}", openfang_types::truncate_str(&entry.detail, 100)),
+            format!(
+                "Agent killed: {}",
+                openfang_types::truncate_str(&entry.detail, 100)
+            ),
             "",
         ),
         _ => return None,
@@ -10325,8 +10588,16 @@ fn audit_to_comms_event(
         kind,
         source_id: entry.agent_id.clone(),
         source_name: resolve_name(&entry.agent_id),
-        target_id: if target_label.is_empty() { String::new() } else { target_label.to_string() },
-        target_name: if target_label.is_empty() { String::new() } else { target_label.to_string() },
+        target_id: if target_label.is_empty() {
+            String::new()
+        } else {
+            target_label.to_string()
+        },
+        target_name: if target_label.is_empty() {
+            String::new()
+        } else {
+            target_label.to_string()
+        },
         detail,
     })
 }
@@ -10377,9 +10648,7 @@ pub async fn comms_events(
 /// GET /api/comms/events/stream — SSE stream of inter-agent communication events.
 ///
 /// Polls the audit log every 500ms for new inter-agent events.
-pub async fn comms_events_stream(
-    State(state): State<Arc<AppState>>,
-) -> axum::response::Response {
+pub async fn comms_events_stream(State(state): State<Arc<AppState>>) -> axum::response::Response {
     use axum::response::sse::{Event, KeepAlive, Sse};
 
     let (tx, rx) = tokio::sync::mpsc::channel::<

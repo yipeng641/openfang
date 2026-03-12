@@ -169,12 +169,19 @@ pub struct ProviderInfo {
     pub api_key_env: String,
     /// Default base URL.
     pub base_url: String,
+    /// Provider protocol type (`openai`, `anthropic`, `gemini`).
+    #[serde(default = "default_provider_protocol")]
+    pub protocol_type: String,
     /// Whether an API key is required (false for local providers).
     pub key_required: bool,
     /// Runtime-detected authentication status.
     pub auth_status: AuthStatus,
     /// Number of models from this provider in the catalog.
     pub model_count: usize,
+}
+
+fn default_provider_protocol() -> String {
+    "openai".to_string()
 }
 
 impl Default for ProviderInfo {
@@ -184,6 +191,7 @@ impl Default for ProviderInfo {
             display_name: String::new(),
             api_key_env: String::new(),
             base_url: String::new(),
+            protocol_type: default_provider_protocol(),
             key_required: true,
             auth_status: AuthStatus::default(),
             model_count: 0,
@@ -286,6 +294,7 @@ mod tests {
             display_name: "Anthropic".to_string(),
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
             base_url: "https://api.anthropic.com".to_string(),
+            protocol_type: "anthropic".to_string(),
             key_required: true,
             auth_status: AuthStatus::Configured,
             model_count: 3,

@@ -163,6 +163,9 @@ pub trait LlmDriver: Send + Sync {
 pub struct DriverConfig {
     /// Provider name.
     pub provider: String,
+    /// Optional wire protocol override for custom providers.
+    #[serde(default)]
+    pub protocol_type: Option<String>,
     /// API key.
     pub api_key: Option<String>,
     /// Base URL override.
@@ -187,6 +190,7 @@ impl std::fmt::Debug for DriverConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DriverConfig")
             .field("provider", &self.provider)
+            .field("protocol_type", &self.protocol_type)
             .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
             .field("base_url", &self.base_url)
             .field("skip_permissions", &self.skip_permissions)

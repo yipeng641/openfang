@@ -47,7 +47,7 @@ pub fn run() {
 
     info!("OpenFang server running on port {port}");
 
-    let url = format!("http://127.0.0.1:{port}");
+    let url = format!("http://127.0.0.1:{port}/app");
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())

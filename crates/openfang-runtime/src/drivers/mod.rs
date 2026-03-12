@@ -15,12 +15,11 @@ use crate::llm_driver::{DriverConfig, LlmDriver, LlmError};
 use openfang_types::model_catalog::{
     AI21_BASE_URL, ANTHROPIC_BASE_URL, CEREBRAS_BASE_URL, CHUTES_BASE_URL, COHERE_BASE_URL,
     DEEPSEEK_BASE_URL, FIREWORKS_BASE_URL, GEMINI_BASE_URL, GROQ_BASE_URL, HUGGINGFACE_BASE_URL,
-    KIMI_CODING_BASE_URL, LEMONADE_BASE_URL, LMSTUDIO_BASE_URL, MINIMAX_BASE_URL,
-    MISTRAL_BASE_URL, MOONSHOT_BASE_URL, OLLAMA_BASE_URL, OPENAI_BASE_URL,
-    OPENROUTER_BASE_URL, PERPLEXITY_BASE_URL, QIANFAN_BASE_URL, QWEN_BASE_URL,
-    REPLICATE_BASE_URL, SAMBANOVA_BASE_URL, TOGETHER_BASE_URL, VENICE_BASE_URL, VLLM_BASE_URL,
-    VOLCENGINE_BASE_URL, VOLCENGINE_CODING_BASE_URL, XAI_BASE_URL, ZAI_BASE_URL,
-    ZAI_CODING_BASE_URL, ZHIPU_BASE_URL, ZHIPU_CODING_BASE_URL,
+    KIMI_CODING_BASE_URL, LEMONADE_BASE_URL, LMSTUDIO_BASE_URL, MINIMAX_BASE_URL, MISTRAL_BASE_URL,
+    MOONSHOT_BASE_URL, OLLAMA_BASE_URL, OPENAI_BASE_URL, OPENROUTER_BASE_URL, PERPLEXITY_BASE_URL,
+    QIANFAN_BASE_URL, QWEN_BASE_URL, REPLICATE_BASE_URL, SAMBANOVA_BASE_URL, TOGETHER_BASE_URL,
+    VENICE_BASE_URL, VLLM_BASE_URL, VOLCENGINE_BASE_URL, VOLCENGINE_CODING_BASE_URL, XAI_BASE_URL,
+    ZAI_BASE_URL, ZAI_CODING_BASE_URL, ZHIPU_BASE_URL, ZHIPU_CODING_BASE_URL,
 };
 use std::sync::Arc;
 
@@ -244,7 +243,10 @@ fn provider_defaults(provider: &str) -> Option<ProviderDefaults> {
 /// - `chutes` — Chutes.ai (serverless open-source model inference)
 /// - Any custom provider with `base_url` set uses OpenAI-compatible format
 pub fn create_driver(config: &DriverConfig) -> Result<Arc<dyn LlmDriver>, LlmError> {
-    let provider = config.provider.as_str();
+    let provider = config
+        .protocol_type
+        .as_deref()
+        .unwrap_or(config.provider.as_str());
 
     // Anthropic uses a different API format — special case
     if provider == "anthropic" {
@@ -289,9 +291,7 @@ pub fn create_driver(config: &DriverConfig) -> Result<Arc<dyn LlmDriver>, LlmErr
             .or_else(|| std::env::var("OPENAI_API_KEY").ok())
             .or_else(crate::model_catalog::read_codex_credential)
             .ok_or_else(|| {
-                LlmError::MissingApiKey(
-                    "Set OPENAI_API_KEY or install Codex CLI".to_string(),
-                )
+                LlmError::MissingApiKey("Set OPENAI_API_KEY or install Codex CLI".to_string())
             })?;
         let base_url = config
             .base_url
@@ -429,21 +429,45 @@ pub fn detect_available_provider() -> Option<(&'static str, &'static str, &'stat
         ("gemini", "gemini-2.5-flash", "GEMINI_API_KEY"),
         ("groq", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
         ("deepseek", "deepseek-chat", "DEEPSEEK_API_KEY"),
-        ("openrouter", "openrouter/google/gemini-2.5-flash", "OPENROUTER_API_KEY"),
+        (
+            "openrouter",
+            "openrouter/google/gemini-2.5-flash",
+            "OPENROUTER_API_KEY",
+        ),
         ("mistral", "mistral-large-latest", "MISTRAL_API_KEY"),
-        ("together", "meta-llama/Llama-3-70b-chat-hf", "TOGETHER_API_KEY"),
-        ("fireworks", "accounts/fireworks/models/llama-v3p1-70b-instruct", "FIREWORKS_API_KEY"),
+        (
+            "together",
+            "meta-llama/Llama-3-70b-chat-hf",
+            "TOGETHER_API_KEY",
+        ),
+        (
+            "fireworks",
+            "accounts/fireworks/models/llama-v3p1-70b-instruct",
+            "FIREWORKS_API_KEY",
+        ),
         ("xai", "grok-2", "XAI_API_KEY"),
-        ("perplexity", "llama-3.1-sonar-large-128k-online", "PERPLEXITY_API_KEY"),
+        (
+            "perplexity",
+            "llama-3.1-sonar-large-128k-online",
+            "PERPLEXITY_API_KEY",
+        ),
         ("cohere", "command-r-plus", "COHERE_API_KEY"),
     ];
     for &(provider, model, env_var) in PROBE_ORDER {
-        if std::env::var(env_var).ok().filter(|v| !v.is_empty()).is_some() {
+        if std::env::var(env_var)
+            .ok()
+            .filter(|v| !v.is_empty())
+            .is_some()
+        {
             return Some((provider, model, env_var));
         }
     }
     // Also check GOOGLE_API_KEY as alias for Gemini
-    if std::env::var("GOOGLE_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+    if std::env::var("GOOGLE_API_KEY")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .is_some()
+    {
         return Some(("gemini", "gemini-2.5-flash", "GOOGLE_API_KEY"));
     }
     None
@@ -523,6 +547,7 @@ mod tests {
     fn test_custom_provider_with_base_url() {
         let config = DriverConfig {
             provider: "my-custom-llm".to_string(),
+            protocol_type: None,
             api_key: Some("test".to_string()),
             base_url: Some("http://localhost:9999/v1".to_string()),
             skip_permissions: true,
@@ -535,6 +560,7 @@ mod tests {
     fn test_unknown_provider_no_url_errors() {
         let config = DriverConfig {
             provider: "nonexistent".to_string(),
+            protocol_type: None,
             api_key: None,
             base_url: None,
             skip_permissions: true,
@@ -636,12 +662,16 @@ mod tests {
         std::env::set_var("NVIDIA_API_KEY", unique_key);
         let config = DriverConfig {
             provider: "nvidia".to_string(),
+            protocol_type: None,
             api_key: None, // not explicitly passed
             base_url: Some("https://integrate.api.nvidia.com/v1".to_string()),
             skip_permissions: true,
         };
         let driver = create_driver(&config);
-        assert!(driver.is_ok(), "Custom provider with env var convention should succeed");
+        assert!(
+            driver.is_ok(),
+            "Custom provider with env var convention should succeed"
+        );
         std::env::remove_var("NVIDIA_API_KEY");
     }
 
@@ -650,6 +680,7 @@ mod tests {
         // Custom provider with neither API key nor base_url should error.
         let config = DriverConfig {
             provider: "nvidia".to_string(),
+            protocol_type: None,
             api_key: None,
             base_url: None,
             skip_permissions: true,
@@ -665,6 +696,7 @@ mod tests {
         std::env::set_var("NVIDIA_API_KEY", unique_key);
         let config = DriverConfig {
             provider: "nvidia".to_string(),
+            protocol_type: None,
             api_key: None,
             base_url: None,
             skip_permissions: true,
@@ -672,7 +704,11 @@ mod tests {
         let result = create_driver(&config);
         assert!(result.is_err());
         let err = result.err().unwrap().to_string();
-        assert!(err.contains("base_url"), "Error should mention base_url: {}", err);
+        assert!(
+            err.contains("base_url"),
+            "Error should mention base_url: {}",
+            err
+        );
         std::env::remove_var("NVIDIA_API_KEY");
     }
 
@@ -689,6 +725,7 @@ mod tests {
         // When api_key is explicitly passed, it should be used regardless of env var.
         let config = DriverConfig {
             provider: "my-custom-provider".to_string(),
+            protocol_type: None,
             api_key: Some("explicit-key".to_string()),
             base_url: Some("https://api.example.com/v1".to_string()),
             skip_permissions: true,

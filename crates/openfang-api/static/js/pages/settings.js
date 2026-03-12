@@ -11,17 +11,20 @@ function settingsPage() {
     providers: [],
     models: [],
     toolSearch: '',
+    providerSearch: '',
     modelSearch: '',
     modelProviderFilter: '',
     modelTierFilter: '',
+    showCustomProviderForm: false,
     showCustomModelForm: false,
     customModelId: '',
-    customModelProvider: 'openrouter',
+    customModelProvider: '',
     customModelContext: 128000,
     customModelMaxOutput: 8192,
     customModelStatus: '',
     providerKeyInputs: {},
     providerUrlInputs: {},
+    providerProtocolInputs: {},
     providerUrlSaving: {},
     providerTesting: {},
     providerTestResults: {},
@@ -29,6 +32,7 @@ function settingsPage() {
     customProviderName: '',
     customProviderUrl: '',
     customProviderKey: '',
+    customProviderProtocol: 'openai',
     customProviderStatus: '',
     addingCustomProvider: false,
     loading: true,
@@ -224,13 +228,14 @@ function settingsPage() {
         this.providers = data.providers || [];
         for (var i = 0; i < this.providers.length; i++) {
           var p = this.providers[i];
-          if (p.is_local) {
-            if (!this.providerUrlInputs[p.id]) {
-              this.providerUrlInputs[p.id] = p.base_url || '';
-            }
-            if (this.providerUrlSaving[p.id] === undefined) {
-              this.providerUrlSaving[p.id] = false;
-            }
+          if (!this.providerUrlInputs[p.id]) {
+            this.providerUrlInputs[p.id] = p.base_url || '';
+          }
+          if (!this.providerProtocolInputs[p.id]) {
+            this.providerProtocolInputs[p.id] = p.protocol_type || 'openai';
+          }
+          if (this.providerUrlSaving[p.id] === undefined) {
+            this.providerUrlSaving[p.id] = false;
           }
         }
       } catch(e) { this.providers = []; }
@@ -245,12 +250,13 @@ function settingsPage() {
 
     async addCustomModel() {
       var id = this.customModelId.trim();
-      if (!id) return;
+      var provider = (this.customModelProvider || '').trim();
+      if (!id || !provider) return;
       this.customModelStatus = 'Adding...';
       try {
         await OpenFangAPI.post('/api/models/custom', {
           id: id,
-          provider: this.customModelProvider || 'openrouter',
+          provider: provider,
           context_window: this.customModelContext || 128000,
           max_output_tokens: this.customModelMaxOutput || 8192,
         });
@@ -336,6 +342,17 @@ function settingsPage() {
       var seen = {};
       this.models.forEach(function(m) { seen[m.provider] = true; });
       return Object.keys(seen).sort();
+    },
+
+    get filteredProviders() {
+      var q = (this.providerSearch || '').toLowerCase().trim();
+      if (!q) return this.providers;
+      return this.providers.filter(function(p) {
+        return (p.id || '').toLowerCase().indexOf(q) !== -1 ||
+               (p.display_name || '').toLowerCase().indexOf(q) !== -1 ||
+               (p.api_key_env || '').toLowerCase().indexOf(q) !== -1 ||
+               (p.base_url || '').toLowerCase().indexOf(q) !== -1;
+      });
     },
 
     get uniqueTiers() {
@@ -490,6 +507,7 @@ function settingsPage() {
 
     async saveProviderUrl(provider) {
       var url = this.providerUrlInputs[provider.id];
+      var protocolType = this.providerProtocolInputs[provider.id] || 'openai';
       if (!url || !url.trim()) { OpenFangToast.error('Please enter a base URL'); return; }
       url = url.trim();
       if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) {
@@ -497,7 +515,7 @@ function settingsPage() {
       }
       this.providerUrlSaving[provider.id] = true;
       try {
-        var result = await OpenFangAPI.put('/api/providers/' + encodeURIComponent(provider.id) + '/url', { base_url: url });
+        var result = await OpenFangAPI.put('/api/providers/' + encodeURIComponent(provider.id) + '/url', { base_url: url, protocol_type: protocolType });
         if (result.reachable) {
           OpenFangToast.success(provider.display_name + ' URL saved &mdash; reachable (' + (result.latency_ms || '?') + 'ms)');
         } else {
@@ -514,6 +532,7 @@ function settingsPage() {
       var name = this.customProviderName.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
       if (!name) { OpenFangToast.error('Please enter a provider name'); return; }
       var url = this.customProviderUrl.trim();
+      var protocolType = this.customProviderProtocol || 'openai';
       if (!url) { OpenFangToast.error('Please enter a base URL'); return; }
       if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) {
         OpenFangToast.error('URL must start with http:// or https://'); return;
@@ -521,14 +540,16 @@ function settingsPage() {
       this.addingCustomProvider = true;
       this.customProviderStatus = '';
       try {
-        var result = await OpenFangAPI.put('/api/providers/' + encodeURIComponent(name) + '/url', { base_url: url });
+        var result = await OpenFangAPI.put('/api/providers/' + encodeURIComponent(name) + '/url', { base_url: url, protocol_type: protocolType });
         if (this.customProviderKey.trim()) {
           await OpenFangAPI.post('/api/providers/' + encodeURIComponent(name) + '/key', { key: this.customProviderKey.trim() });
         }
         this.customProviderName = '';
         this.customProviderUrl = '';
         this.customProviderKey = '';
+        this.customProviderProtocol = 'openai';
         this.customProviderStatus = '';
+        this.showCustomProviderForm = false;
         OpenFangToast.success('Provider "' + name + '" added' + (result.reachable ? ' (reachable)' : ' (not reachable yet)'));
         await this.loadProviders();
       } catch(e) {

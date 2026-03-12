@@ -206,7 +206,8 @@ fn parse_gemini_error(body: &str) -> String {
     }
     // Google sometimes returns bare JSON arrays or HTML error pages
     if body.starts_with('<') {
-        return "Google API returned an HTML error page — check your API key and model name".to_string();
+        return "Google API returned an HTML error page — check your API key and model name"
+            .to_string();
     }
     body.to_string()
 }
@@ -399,9 +400,8 @@ fn convert_response(resp: GeminiResponse) -> Result<CompletionResponse, LlmError
                             // it gets echoed back on the next request.  Gemini
                             // 3.x thinking models include thoughtSignature on
                             // ALL parts (text + functionCall).
-                            let provider_metadata = thought_signature.map(|sig| {
-                                serde_json::json!({ "thought_signature": sig })
-                            });
+                            let provider_metadata = thought_signature
+                                .map(|sig| serde_json::json!({ "thought_signature": sig }));
                             content.push(ContentBlock::Text {
                                 text,
                                 provider_metadata,
@@ -417,9 +417,8 @@ fn convert_response(resp: GeminiResponse) -> Result<CompletionResponse, LlmError
                         // gets echoed back on the next request (Gemini 2.5+/3.x).
                         // The signature lives at the part level, not inside
                         // functionCall.
-                        let provider_metadata = thought_signature.map(|sig| {
-                            serde_json::json!({ "thought_signature": sig })
-                        });
+                        let provider_metadata = thought_signature
+                            .map(|sig| serde_json::json!({ "thought_signature": sig }));
                         content.push(ContentBlock::ToolUse {
                             id: id.clone(),
                             name: function_call.name.clone(),
@@ -439,10 +438,7 @@ fn convert_response(resp: GeminiResponse) -> Result<CompletionResponse, LlmError
             }
         }
         None => {
-            let reason = candidate
-                .finish_reason
-                .as_deref()
-                .unwrap_or("unknown");
+            let reason = candidate.finish_reason.as_deref().unwrap_or("unknown");
             warn!(finish_reason = %reason, "Gemini returned candidate with no content");
             return Err(LlmError::Parse(format!(
                 "Gemini returned empty response (finish_reason: {reason})"
@@ -499,7 +495,9 @@ impl LlmDriver for GeminiDriver {
         for attempt in 0..=max_retries {
             let url = format!(
                 "{}/v1beta/models/{}:generateContent?key={}",
-                self.base_url, request.model, self.api_key.as_str()
+                self.base_url,
+                request.model,
+                self.api_key.as_str()
             );
             debug!(url = %url, attempt, "Sending Gemini API request");
 
@@ -583,7 +581,9 @@ impl LlmDriver for GeminiDriver {
         for attempt in 0..=max_retries {
             let url = format!(
                 "{}/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
-                self.base_url, request.model, self.api_key.as_str()
+                self.base_url,
+                request.model,
+                self.api_key.as_str()
             );
             debug!(url = %url, attempt, "Sending Gemini streaming request");
 
@@ -740,9 +740,8 @@ impl LlmDriver for GeminiDriver {
             let mut tool_calls = Vec::new();
 
             if !text_content.is_empty() {
-                let provider_metadata = text_thought_sig.map(|sig| {
-                    serde_json::json!({ "thought_signature": sig })
-                });
+                let provider_metadata =
+                    text_thought_sig.map(|sig| serde_json::json!({ "thought_signature": sig }));
                 content.push(ContentBlock::Text {
                     text: text_content,
                     provider_metadata,
@@ -1138,7 +1137,9 @@ mod tests {
             ContentBlock::ToolUse {
                 provider_metadata, ..
             } => {
-                let meta = provider_metadata.as_ref().expect("provider_metadata should be set");
+                let meta = provider_metadata
+                    .as_ref()
+                    .expect("provider_metadata should be set");
                 assert_eq!(meta["thought_signature"], "abc123signature");
             }
             _ => panic!("Expected ToolUse content block"),
@@ -1174,7 +1175,9 @@ mod tests {
                 provider_metadata,
             } => {
                 assert_eq!(text, "Let me think about this...");
-                let meta = provider_metadata.as_ref().expect("provider_metadata should be set for text with thoughtSignature");
+                let meta = provider_metadata
+                    .as_ref()
+                    .expect("provider_metadata should be set for text with thoughtSignature");
                 assert_eq!(meta["thought_signature"], "text_sig_456");
             }
             _ => panic!("Expected Text content block"),
@@ -1223,10 +1226,7 @@ mod tests {
                 thought_signature,
             } => {
                 assert_eq!(function_call.name, "web_search");
-                assert_eq!(
-                    thought_signature.as_deref(),
-                    Some("sig_xyz789")
-                );
+                assert_eq!(thought_signature.as_deref(), Some("sig_xyz789"));
             }
             _ => panic!("Expected FunctionCall part"),
         }
@@ -1259,10 +1259,7 @@ mod tests {
                 thought_signature,
             } => {
                 assert_eq!(text, "Let me think...");
-                assert_eq!(
-                    thought_signature.as_deref(),
-                    Some("text_sig_abc")
-                );
+                assert_eq!(thought_signature.as_deref(), Some("text_sig_abc"));
             }
             _ => panic!("Expected Text part"),
         }
@@ -1365,10 +1362,7 @@ mod tests {
             GeminiPart::FunctionCall {
                 thought_signature, ..
             } => {
-                assert_eq!(
-                    thought_signature.as_deref(),
-                    Some("my_sig_abc")
-                );
+                assert_eq!(thought_signature.as_deref(), Some("my_sig_abc"));
             }
             _ => panic!("Expected FunctionCall"),
         }

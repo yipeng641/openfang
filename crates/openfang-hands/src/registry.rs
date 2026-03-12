@@ -170,7 +170,8 @@ impl HandRegistry {
 
     /// List all known hand definitions.
     pub fn list_definitions(&self) -> Vec<HandDefinition> {
-        let mut defs: Vec<HandDefinition> = self.definitions.iter().map(|r| r.value().clone()).collect();
+        let mut defs: Vec<HandDefinition> =
+            self.definitions.iter().map(|r| r.value().clone()).collect();
         defs.sort_by(|a, b| a.name.cmp(&b.name));
         defs
     }
@@ -363,9 +364,10 @@ impl HandRegistry {
         let requirements_met = reqs.iter().all(|(_, ok)| *ok);
 
         // A hand is active if at least one instance is in Active status.
-        let active = self.instances.iter().any(|entry| {
-            entry.hand_id == hand_id && entry.status == HandStatus::Active
-        });
+        let active = self
+            .instances
+            .iter()
+            .any(|entry| entry.hand_id == hand_id && entry.status == HandStatus::Active);
 
         // Degraded: active, but at least one non-optional requirement is unmet
         // OR any optional requirement is unmet. In practice, the most useful
@@ -420,7 +422,9 @@ fn check_requirement(req: &HandRequirement) -> bool {
                     || which_binary("google-chrome")
                     || which_binary("google-chrome-stable")
                     || which_binary("chrome")
-                    || std::env::var("CHROME_PATH").map(|v| !v.is_empty()).unwrap_or(false);
+                    || std::env::var("CHROME_PATH")
+                        .map(|v| !v.is_empty())
+                        .unwrap_or(false);
             }
             false
         }

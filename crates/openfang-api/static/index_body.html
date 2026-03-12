@@ -3126,10 +3126,18 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
           <div x-show="tab === 'providers'">
             <div class="info-card">
               <h4>LLM Providers</h4>
-              <p>OpenFang supports 12 LLM providers out of the box. Configure API keys to unlock models from each provider. Set environment variables and restart, or use the form below to save keys directly.</p>
+              <p>OpenFang no longer ships builtin providers here. Add your own provider with only <code>name</code>, <code>base_url</code>, <code>api_key</code>, and <code>protocol_type</code>.</p>
             </div>
-            <div class="card-grid">
-              <template x-for="p in providers" :key="p.id">
+            <div class="flex gap-2 mb-4" style="flex-wrap:wrap">
+              <div class="search-input" style="flex:1;min-width:200px">
+                <span style="color:var(--text-muted)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
+                <input placeholder="Search providers..." x-model="providerSearch">
+              </div>
+              <button class="btn btn-primary btn-sm" @click="showCustomProviderForm = !showCustomProviderForm" x-text="showCustomProviderForm ? 'Cancel' : '+ Provider'"></button>
+            </div>
+            <div class="text-xs text-dim mb-2" x-text="filteredProviders.length + ' of ' + providers.length + ' providers'"></div>
+            <div class="card-grid" x-show="filteredProviders.length">
+              <template x-for="p in filteredProviders" :key="p.id">
                 <div class="card provider-card" :class="providerCardClass(p)">
                   <div class="flex justify-between items-center mb-2">
                     <div class="card-header" style="margin:0" x-text="p.display_name"></div>
@@ -3147,21 +3155,6 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
                   <template x-if="p.auth_status !== 'configured' && p.api_key_env">
                     <div class="text-xs text-dim mt-2">Or set <code style="color:var(--accent-light);background:var(--bg);padding:1px 4px;border-radius:2px" x-text="p.api_key_env"></code> in your environment and restart</div>
                   </template>
-                  <!-- Copilot OAuth button -->
-                  <template x-if="p.id === 'github-copilot' && p.auth_status !== 'configured'">
-                    <div class="mt-2">
-                      <button class="btn btn-primary btn-sm" @click="startCopilotOAuth()" :disabled="copilotOAuth.polling" x-show="!copilotOAuth.userCode">Login with GitHub</button>
-                      <div x-show="copilotOAuth.userCode" class="mt-2">
-                        <div class="text-sm">Visit <a :href="copilotOAuth.verificationUri" target="_blank" x-text="copilotOAuth.verificationUri" style="color:var(--accent-light)"></a> and enter:</div>
-                        <div style="font-size:24px;font-weight:bold;letter-spacing:4px;margin:8px 0;color:var(--accent-light)" x-text="copilotOAuth.userCode"></div>
-                        <div class="text-xs text-dim"><span class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle"></span> Waiting for authorization...</div>
-                      </div>
-                    </div>
-                  </template>
-                  <!-- Claude Code install hint -->
-                  <template x-if="p.id === 'claude-code' && p.auth_status !== 'configured'">
-                    <div class="mt-2 text-xs text-dim">Install: <code style="color:var(--accent-light);background:var(--bg);padding:1px 4px;border-radius:2px">npm install -g @anthropic-ai/claude-code</code></div>
-                  </template>
                   <!-- Actions for configured providers -->
                   <template x-if="p.auth_status === 'configured'">
                     <div class="flex gap-2 mt-2">
@@ -3176,27 +3169,34 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
                   <template x-if="!p.api_key_env || p.key_required === false">
                     <div class="text-xs mt-2" style="color:var(--success)" x-show="p.auth_status !== 'configured' && p.auth_status !== 'not_set' && p.auth_status !== 'missing'">No API key needed &mdash; runs locally or is free</div>
                   </template>
-                  <!-- Base URL editor for local providers -->
-                  <template x-if="p.is_local">
-                    <div class="mt-3" style="border-top:1px solid var(--border);padding-top:8px">
-                      <div class="text-xs text-dim mb-1">Base URL</div>
-                      <div class="key-input-group">
-                        <input type="text" :placeholder="'http://localhost:...'" x-model="providerUrlInputs[p.id]" style="font-size:12px">
-                        <button class="btn btn-primary btn-sm" @click="saveProviderUrl(p)" :disabled="providerUrlSaving[p.id]">
-                          <span x-show="!providerUrlSaving[p.id]">Save</span>
-                          <span x-show="providerUrlSaving[p.id]" class="spinner" style="width:10px;height:10px;border-width:2px"></span>
-                        </button>
+                  <div class="mt-3" style="border-top:1px solid var(--border);padding-top:8px">
+                    <div style="display:grid;grid-template-columns:1fr 140px;gap:0.5rem">
+                      <div>
+                        <div class="text-xs text-dim mb-1">Base URL</div>
+                        <input type="text" class="form-input" :placeholder="'https://api.example.com/v1'" x-model="providerUrlInputs[p.id]" style="font-size:12px">
+                      </div>
+                      <div>
+                        <div class="text-xs text-dim mb-1">Protocol</div>
+                        <select class="form-select" x-model="providerProtocolInputs[p.id]" style="font-size:12px">
+                          <option value="openai">openai</option>
+                          <option value="anthropic">anthropic</option>
+                          <option value="gemini">gemini</option>
+                        </select>
                       </div>
                     </div>
-                  </template>
+                    <button class="btn btn-primary btn-sm mt-2" @click="saveProviderUrl(p)" :disabled="providerUrlSaving[p.id]">
+                      <span x-show="!providerUrlSaving[p.id]">Save Config</span>
+                      <span x-show="providerUrlSaving[p.id]" class="spinner" style="width:10px;height:10px;border-width:2px"></span>
+                    </button>
+                  </div>
                 </div>
               </template>
             </div>
             <!-- Add Custom Provider -->
-            <div class="info-card mt-4" style="border:1px solid var(--border)">
+            <div x-show="showCustomProviderForm" class="info-card mt-4" style="border:1px solid var(--border)">
               <h4 style="margin-top:0">Add Custom Provider</h4>
-              <p class="text-xs text-dim mb-2">Connect any OpenAI-compatible API (vLLM, LiteLLM, LocalAI, etc.)</p>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+              <p class="text-xs text-dim mb-2">只保留用户自定义 provider；按需填写即可。</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:0.5rem">
                 <div>
                   <label class="text-xs text-dim">Provider Name</label>
                   <input class="form-input" x-model="customProviderName" placeholder="e.g. my-local-llm">
@@ -3204,6 +3204,14 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
                 <div>
                   <label class="text-xs text-dim">Base URL (required)</label>
                   <input class="form-input" x-model="customProviderUrl" placeholder="http://localhost:8080/v1">
+                </div>
+                <div>
+                  <label class="text-xs text-dim">Protocol Type</label>
+                  <select class="form-select" x-model="customProviderProtocol">
+                    <option value="openai">openai</option>
+                    <option value="anthropic">anthropic</option>
+                    <option value="gemini">gemini</option>
+                  </select>
                 </div>
               </div>
               <div class="mt-2">
@@ -3216,9 +3224,9 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
               </button>
               <span class="text-xs text-dim ml-2" x-text="customProviderStatus"></span>
             </div>
-            <div class="empty-state" x-show="!providers.length">
-              <h4>No providers found</h4>
-              <p class="hint">Provider information could not be loaded. Check that the API is running.</p>
+            <div class="empty-state" x-show="!filteredProviders.length">
+              <h4>No providers yet</h4>
+              <p class="hint" x-text="providers.length ? '没有匹配的 provider，试试别的关键词。' : '当前没有任何内置 provider。请先添加一个自定义 provider。'"></p>
             </div>
           </div>
 
@@ -3257,7 +3265,7 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
                 </div>
                 <div>
                   <label class="text-xs text-dim">Provider</label>
-                  <input class="form-input" x-model="customModelProvider" placeholder="openrouter">
+                  <input class="form-input" x-model="customModelProvider" placeholder="my-provider">
                 </div>
                 <div>
                   <label class="text-xs text-dim">Context Window</label>
@@ -3268,14 +3276,14 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path"]</pre>
                   <input class="form-input" type="number" x-model.number="customModelMaxOutput" placeholder="8192">
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm mt-2" @click="addCustomModel()" :disabled="!customModelId.trim()">Add Model</button>
+              <button class="btn btn-primary btn-sm mt-2" @click="addCustomModel()" :disabled="!customModelId.trim() || !customModelProvider.trim()">Add Model</button>
               <span class="text-xs text-dim ml-2" x-text="customModelStatus"></span>
             </div>
             <div class="text-xs text-dim mb-2" x-text="filteredModels.length + ' of ' + models.length + ' models'"></div>
             <div x-show="!filteredModels.length && !settingsLoading" style="text-align:center;padding:32px 16px">
               <div style="font-size:32px;margin-bottom:8px;opacity:0.5">&#x1F916;</div>
               <h3 style="margin:0 0 4px;font-size:14px" x-text="models.length ? 'No models match your search' : 'No models available'"></h3>
-              <p class="text-xs text-dim" x-text="models.length ? 'Try a different search term or clear filters.' : 'Configure an LLM provider to see available models.'"></p>
+              <p class="text-xs text-dim" x-text="models.length ? 'Try a different search term or clear filters.' : '先添加 provider，再手动添加 model。'"></p>
               <button class="btn btn-ghost btn-sm mt-2" x-show="models.length && (modelSearch || modelProviderFilter)" @click="modelSearch=''; modelProviderFilter=''">Clear Filters</button>
             </div>
             <div class="table-wrap" x-show="filteredModels.length">

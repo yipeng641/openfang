@@ -12,8 +12,12 @@
 //! - WebSocket real-time chat with HTTP fallback
 //! - Agent management, workflows, memory browser, audit log, and more
 
-use axum::http::header;
-use axum::response::IntoResponse;
+use axum::extract::Path;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
+use include_dir::{include_dir, Dir};
+
+static FRONTEND_APP_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static/app");
 
 /// Compile-time ETag based on the crate version.
 const ETAG: &str = concat!("\"openfang-", env!("CARGO_PKG_VERSION"), "\"");
@@ -60,6 +64,67 @@ pub async fn webchat_page() -> impl IntoResponse {
             ),
         ],
         WEBCHAT_HTML,
+    )
+}
+
+/// GET /app - Serve the new Vue frontend entrypoint.
+pub async fn frontend_app_page() -> impl IntoResponse {
+    serve_frontend_asset("index.html")
+}
+
+/// GET /app/*path - Serve embedded Vue frontend assets.
+pub async fn frontend_app_asset(Path(path): Path<String>) -> impl IntoResponse {
+    let clean_path = path.trim_matches('/');
+    if clean_path.is_empty() {
+        return serve_frontend_asset("index.html");
+    }
+
+    if let Some(response) = serve_known_frontend_asset(clean_path) {
+        return response;
+    }
+
+    if !clean_path.contains('.') {
+        return serve_frontend_asset("index.html");
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        "Frontend asset not found",
+    )
+        .into_response()
+}
+
+fn serve_frontend_asset(path: &str) -> Response {
+    serve_known_frontend_asset(path).unwrap_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "Frontend app has not been built yet",
+        )
+            .into_response()
+    })
+}
+
+fn serve_known_frontend_asset(path: &str) -> Option<Response> {
+    let file = FRONTEND_APP_DIR.get_file(path)?;
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let cache_control = if path.ends_with(".html") {
+        "public, max-age=3600, must-revalidate"
+    } else {
+        "public, max-age=86400, immutable"
+    };
+
+    Some(
+        (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, mime.as_ref()),
+                (header::CACHE_CONTROL, cache_control),
+            ],
+            file.contents(),
+        )
+            .into_response(),
     )
 }
 

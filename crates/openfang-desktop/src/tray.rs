@@ -122,7 +122,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             }
             "browser" => {
                 if let Some(port) = app.try_state::<crate::PortState>() {
-                    let url = format!("http://127.0.0.1:{}", port.0);
+                    let url = format!("http://127.0.0.1:{}/app", port.0);
                     let _ = open::that(&url);
                 }
             }

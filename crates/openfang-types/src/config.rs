@@ -1068,6 +1068,9 @@ pub struct KernelConfig {
     /// If not set, the convention `{PROVIDER_UPPER}_API_KEY` is used automatically.
     #[serde(default)]
     pub provider_api_keys: HashMap<String, String>,
+    /// Provider protocol overrides (provider ID -> protocol type).
+    #[serde(default)]
+    pub provider_protocols: HashMap<String, String>,
     /// OAuth client ID overrides for PKCE flows.
     #[serde(default)]
     pub oauth: OAuthConfig,
@@ -1247,6 +1250,7 @@ impl Default for KernelConfig {
             budget: BudgetConfig::default(),
             provider_urls: HashMap::new(),
             provider_api_keys: HashMap::new(),
+            provider_protocols: HashMap::new(),
             oauth: OAuthConfig::default(),
         }
     }
@@ -1365,6 +1369,10 @@ impl std::fmt::Debug for KernelConfig {
                 "provider_api_keys",
                 &format!("{} mapping(s)", self.provider_api_keys.len()),
             )
+            .field(
+                "provider_protocols",
+                &format!("{} mapping(s)", self.provider_protocols.len()),
+            )
             .finish()
     }
 }
@@ -1398,9 +1406,9 @@ pub struct DefaultModelConfig {
 impl Default for DefaultModelConfig {
     fn default() -> Self {
         Self {
-            provider: "anthropic".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
-            api_key_env: "ANTHROPIC_API_KEY".to_string(),
+            provider: String::new(),
+            model: String::new(),
+            api_key_env: String::new(),
             base_url: None,
         }
     }
@@ -3732,10 +3740,7 @@ mod tests {
             }],
         );
         // Auth profiles take precedence over convention (but not explicit mapping)
-        assert_eq!(
-            config.resolve_api_key_env("nvidia"),
-            "NVIDIA_PRIMARY_KEY"
-        );
+        assert_eq!(config.resolve_api_key_env("nvidia"), "NVIDIA_PRIMARY_KEY");
     }
 
     #[test]
