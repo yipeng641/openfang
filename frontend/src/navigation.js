@@ -80,33 +80,20 @@ export const sections = [
   },
 ]
 
-export const redirects = {
-  chat: 'agents',
-  templates: 'agents',
-  triggers: 'workflows',
-  cron: 'scheduler',
-  schedules: 'scheduler',
-  memory: 'sessions',
-  audit: 'logs',
-  security: 'settings',
-  peers: 'settings',
-  migration: 'settings',
-  usage: 'analytics',
-  approval: 'approvals',
-}
-
 export const pageCatalog = sections.flatMap((section) => section.children)
 export const sectionKeys = sections.map((section) => section.key)
 
-export function resolvePageFromHash(hashValue) {
-  let hash = (hashValue || '').replace(/^#/, '').trim().toLowerCase() || 'agents'
-  if (redirects[hash]) {
-    hash = redirects[hash]
-  }
-  if (pageCatalog.some((page) => page.key === hash)) {
-    return hash
+export function resolvePageKey(pageKey) {
+  const normalized = String(pageKey || '').trim().toLowerCase()
+  if (pageCatalog.some((page) => page.key === normalized)) {
+    return normalized
   }
   return 'agents'
+}
+
+export function getSectionForPage(pageKey) {
+  const resolved = resolvePageKey(pageKey)
+  return sections.find((section) => section.children.some((page) => page.key === resolved)) || sections[0]
 }
 
 export function getAccordionOpenKeys(nextOpenKeys) {

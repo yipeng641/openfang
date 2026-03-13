@@ -1,27 +1,21 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import NativePageHost from './components/NativePageHost.vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getAccordionOpenKeys,
+  getSectionForPage,
   pageCatalog,
-  resolvePageFromHash,
+  resolvePageKey,
   sections,
 } from './navigation'
 
+const route = useRoute()
+const router = useRouter()
 const openKeys = ref([])
-const currentPage = ref(resolvePageFromHash(window.location.hash))
-
-function syncFromHash() {
-  const resolved = resolvePageFromHash(window.location.hash)
-  if (resolved !== window.location.hash.replace(/^#/, '').trim().toLowerCase()) {
-    window.location.hash = resolved
-  }
-  currentPage.value = resolved
-}
+const currentPage = computed(() => resolvePageKey(route.name))
 
 function selectPage({ key }) {
-  window.location.hash = key
-  currentPage.value = key
+  router.push({ name: key })
 }
 
 function handleOpenChange(nextOpenKeys) {
@@ -29,16 +23,15 @@ function handleOpenChange(nextOpenKeys) {
 }
 
 const currentMeta = computed(() => pageCatalog.find((page) => page.key === currentPage.value) || pageCatalog[0])
-const currentSection = computed(() => sections.find((section) => section.children.some((page) => page.key === currentPage.value)) || sections[0])
+const currentSection = computed(() => getSectionForPage(currentPage.value))
 
-onMounted(() => {
-  syncFromHash()
-  window.addEventListener('hashchange', syncFromHash)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('hashchange', syncFromHash)
-})
+watch(
+  currentSection,
+  (section) => {
+    openKeys.value = [section.key]
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -75,23 +68,17 @@ onBeforeUnmount(() => {
     </a-layout-sider>
 
     <a-layout class="h-full min-h-0 overflow-hidden">
-      <a-layout-header class="shrink-0 !h-auto border-b border-slate-200 !bg-white px-6 py-4">
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{{ currentSection.label }}</div>
-            <div class="mt-1 text-lg font-semibold text-slate-900">{{ currentMeta.label }}</div>
-            <div class="text-sm text-slate-500">{{ currentMeta.desc }}</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <a-tag color="green">Native Vue</a-tag>
-            <a-tag color="blue">/app</a-tag>
-          </div>
+      <a-layout-header class="shrink-0 !h-auto border-b border-slate-200 !bg-white px-5 py-1.5">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-slate-400">{{ currentSection.label }}</span>
+          <span class="text-slate-300">/</span>
+          <span class="font-medium text-slate-800">{{ currentMeta.label }}</span>
         </div>
       </a-layout-header>
 
       <a-layout-content class="min-h-0 flex-1 overflow-auto px-5 py-5 xl:px-6">
         <div class="h-full w-full max-w-none">
-          <NativePageHost :page="currentPage" />
+          <router-view />
         </div>
       </a-layout-content>
     </a-layout>

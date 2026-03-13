@@ -4,7 +4,9 @@ import { mount } from '@vue/test-utils'
 import { defineComponent, nextTick, ref } from 'vue'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import Antd from 'ant-design-vue'
+import { createMemoryHistory } from 'vue-router'
 import App from './App.vue'
+import { createAppRouter } from './router'
 import { getAccordionOpenKeys, sectionKeys } from './navigation'
 
 beforeAll(() => {
@@ -21,10 +23,11 @@ beforeAll(() => {
       dispatchEvent: () => false,
     }),
   })
+  window.scrollTo = () => {}
 })
 
 afterEach(() => {
-  window.location.hash = ''
+  window.history.replaceState({}, '', '/')
 })
 
 describe('App menu', () => {
@@ -103,11 +106,15 @@ describe('App menu', () => {
   })
 
   it('expands a submenu when its title is clicked', async () => {
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/agents')
+    await router.isReady()
+
     const wrapper = mount(App, {
       global: {
-        plugins: [Antd],
+        plugins: [Antd, router],
         stubs: {
-          NativePageHost: { template: '<div data-test="native-page-host" />' },
+          RouterView: { template: '<div data-test="router-view" />' },
         },
       },
     })

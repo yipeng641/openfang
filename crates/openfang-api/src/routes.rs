@@ -5947,6 +5947,101 @@ pub async fn remove_custom_model(
     )
 }
 
+/// POST /api/models/test/{id} — Test a specific model's connectivity.
+///
+/// Sends a minimal completion request ("Hi", max_tokens=1) to verify the model
+/// is reachable and can generate completions.
+pub async fn test_model(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(model_id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let (provider_id, base_url, api_key_env, protocol_type) = {
+        let catalog = state
+            .kernel
+            .model_catalog
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        match catalog.find_model(&model_id) {
+            Some(m) => {
+                let provider = catalog.get_provider(&m.provider);
+                let base_url = provider.map(|p| p.base_url.clone()).unwrap_or_default();
+                let env_var = provider.map(|p| p.api_key_env.clone()).unwrap_or_default();
+                let proto = provider
+                    .map(|p| p.protocol_type.clone())
+                    .unwrap_or_else(|| "openai".to_string());
+                (m.provider.clone(), base_url, env_var, proto)
+            }
+            None => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({"error": format!("Model '{}' not found", model_id)})),
+                );
+            }
+        }
+    };
+
+    let api_key = std::env::var(&api_key_env).ok();
+
+    let start = std::time::Instant::now();
+    let driver_config = openfang_runtime::llm_driver::DriverConfig {
+        provider: provider_id.clone(),
+        protocol_type: Some(protocol_type),
+        api_key,
+        base_url: if base_url.is_empty() {
+            None
+        } else {
+            Some(base_url)
+        },
+        skip_permissions: true,
+    };
+
+    match openfang_runtime::drivers::create_driver(&driver_config) {
+        Ok(driver) => {
+            let test_req = openfang_runtime::llm_driver::CompletionRequest {
+                model: model_id.clone(),
+                messages: vec![openfang_types::message::Message::user("Hi")],
+                tools: vec![],
+                max_tokens: 1,
+                temperature: 0.0,
+                system: None,
+                thinking: None,
+            };
+            match driver.complete(test_req).await {
+                Ok(_) => {
+                    let latency_ms = start.elapsed().as_millis();
+                    (
+                        StatusCode::OK,
+                        Json(serde_json::json!({
+                            "status": "ok",
+                            "model": model_id,
+                            "provider": provider_id,
+                            "latency_ms": latency_ms,
+                        })),
+                    )
+                }
+                Err(e) => (
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "status": "error",
+                        "model": model_id,
+                        "provider": provider_id,
+                        "error": format!("{e}"),
+                    })),
+                ),
+            }
+        }
+        Err(e) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "error",
+                "model": model_id,
+                "provider": provider_id,
+                "error": format!("Failed to create driver: {e}"),
+            })),
+        ),
+    }
+}
+
 // ── A2A (Agent-to-Agent) Protocol Endpoints ─────────────────────────
 
 /// GET /.well-known/agent.json — A2A Agent Card for the default agent.

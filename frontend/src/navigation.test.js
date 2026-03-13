@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   getAccordionOpenKeys,
+  getSectionForPage,
   hasUniqueMenuKeys,
-  resolvePageFromHash,
+  resolvePageKey,
   sectionKeys,
 } from './navigation'
 
@@ -11,15 +12,16 @@ describe('navigation', () => {
     expect(hasUniqueMenuKeys()).toBe(true)
   })
 
-  it('resolves legacy aliases to canonical pages', () => {
-    expect(resolvePageFromHash('#chat')).toBe('agents')
-    expect(resolvePageFromHash('#usage')).toBe('analytics')
-    expect(resolvePageFromHash('#security')).toBe('settings')
+  it('resolves known and unknown page keys', () => {
+    expect(resolvePageKey('agents')).toBe('agents')
+    expect(resolvePageKey('analytics')).toBe('analytics')
+    expect(resolvePageKey('does-not-exist')).toBe('agents')
   })
 
-  it('falls back to agents for unknown hashes', () => {
-    expect(resolvePageFromHash('#does-not-exist')).toBe('agents')
-    expect(resolvePageFromHash('')).toBe('agents')
+  it('finds the section for a given page', () => {
+    expect(getSectionForPage('overview').key).toBe('group-monitor')
+    expect(getSectionForPage('providers').key).toBe('group-llm')
+    expect(getSectionForPage('does-not-exist').key).toBe('group-chat')
   })
 
   it('keeps only the latest expanded section', () => {

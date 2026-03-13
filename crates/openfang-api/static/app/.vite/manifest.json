@@ -1,11 +1,147 @@
 {
+  "_ApiOutlined-CbvjjpeN.js": {
+    "file": "assets/ApiOutlined-CbvjjpeN.js",
+    "name": "ApiOutlined",
+    "imports": [
+      "index.html"
+    ]
+  },
+  "_api-suOn0GqK.js": {
+    "file": "assets/api-suOn0GqK.js",
+    "name": "api"
+  },
+  "_data-utils-Dfh7w876.js": {
+    "file": "assets/data-utils-Dfh7w876.js",
+    "name": "data-utils"
+  },
   "index.html": {
-    "file": "assets/index-ChWUq7nN.js",
+    "file": "assets/index-SHvTByND.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
+    "dynamicImports": [
+      "src/components/OverviewPage.vue",
+      "src/components/AnalyticsPage.vue",
+      "src/components/CommsPage.vue",
+      "src/components/ProvidersPage.vue",
+      "src/components/ModelsPage.vue",
+      "src/components/ChatPage.vue",
+      "src/components/ApprovalsPage.vue",
+      "src/components/LogsPage.vue",
+      "src/components/SessionsPage.vue",
+      "src/components/NativeDataPage.vue"
+    ],
     "css": [
-      "assets/index-DWSTr3gQ.css"
+      "assets/index-B1e05XfA.css"
+    ]
+  },
+  "src/components/AnalyticsPage.vue": {
+    "file": "assets/AnalyticsPage-DlUYc09J.js",
+    "name": "AnalyticsPage",
+    "src": "src/components/AnalyticsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js",
+      "index.html"
+    ]
+  },
+  "src/components/ApprovalsPage.vue": {
+    "file": "assets/ApprovalsPage-BLs0UGFy.js",
+    "name": "ApprovalsPage",
+    "src": "src/components/ApprovalsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js",
+      "index.html"
+    ]
+  },
+  "src/components/ChatPage.vue": {
+    "file": "assets/ChatPage-Ci9rfyiD.js",
+    "name": "ChatPage",
+    "src": "src/components/ChatPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js"
+    ]
+  },
+  "src/components/CommsPage.vue": {
+    "file": "assets/CommsPage-B5HSW7EI.js",
+    "name": "CommsPage",
+    "src": "src/components/CommsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js",
+      "index.html"
+    ]
+  },
+  "src/components/LogsPage.vue": {
+    "file": "assets/LogsPage-oX0DTnry.js",
+    "name": "LogsPage",
+    "src": "src/components/LogsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js",
+      "index.html"
+    ]
+  },
+  "src/components/ModelsPage.vue": {
+    "file": "assets/ModelsPage-C8IqlqNe.js",
+    "name": "ModelsPage",
+    "src": "src/components/ModelsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "index.html",
+      "_ApiOutlined-CbvjjpeN.js"
+    ]
+  },
+  "src/components/NativeDataPage.vue": {
+    "file": "assets/NativeDataPage-C2a0H60l.js",
+    "name": "NativeDataPage",
+    "src": "src/components/NativeDataPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "_data-utils-Dfh7w876.js",
+      "index.html"
+    ]
+  },
+  "src/components/OverviewPage.vue": {
+    "file": "assets/OverviewPage-B4TMMveC.js",
+    "name": "OverviewPage",
+    "src": "src/components/OverviewPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "index.html",
+      "_data-utils-Dfh7w876.js"
+    ]
+  },
+  "src/components/ProvidersPage.vue": {
+    "file": "assets/ProvidersPage-BqXg1q89.js",
+    "name": "ProvidersPage",
+    "src": "src/components/ProvidersPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_api-suOn0GqK.js",
+      "index.html",
+      "_ApiOutlined-CbvjjpeN.js"
+    ]
+  },
+  "src/components/SessionsPage.vue": {
+    "file": "assets/SessionsPage-tqrZLFXy.js",
+    "name": "SessionsPage",
+    "src": "src/components/SessionsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_api-suOn0GqK.js"
     ]
   }
 }
