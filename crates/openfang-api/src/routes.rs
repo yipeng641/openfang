@@ -10277,7 +10277,7 @@ pub async fn pairing_notify(
 pub async fn list_commands(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut commands = vec![
         serde_json::json!({"cmd": "/help", "desc": "Show available commands"}),
-        serde_json::json!({"cmd": "/new", "desc": "Reset session (clear history)"}),
+        serde_json::json!({"cmd": "/new", "desc": "Start a new session"}),
         serde_json::json!({"cmd": "/compact", "desc": "Trigger LLM session compaction"}),
         serde_json::json!({"cmd": "/model", "desc": "Show or switch model (/model [name])"}),
         serde_json::json!({"cmd": "/stop", "desc": "Cancel current agent run"}),

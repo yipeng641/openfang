@@ -82,6 +82,14 @@ fn uses_completion_tokens(model: &str) -> bool {
         || m.starts_with("o4")
 }
 
+fn response_body_preview(body: &str) -> String {
+    body.chars()
+        .take(200)
+        .collect::<String>()
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+}
+
 /// Returns true if a model rejects the `temperature` parameter.
 ///
 /// OpenAI's o-series reasoning models and GPT-5-mini variants only accept
@@ -429,6 +437,12 @@ impl LlmDriver for OpenAIDriver {
                 .map_err(|e| LlmError::Http(e.to_string()))?;
 
             let status = resp.status().as_u16();
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
             if status == 429 {
                 if attempt < max_retries {
                     let retry_ms = (attempt + 1) as u64 * 2000;
@@ -443,6 +457,7 @@ impl LlmDriver for OpenAIDriver {
 
             if !resp.status().is_success() {
                 let body = resp.text().await.unwrap_or_default();
+                let body_preview = response_body_preview(&body);
 
                 // Groq "tool_use_failed": model generated tool call in XML format.
                 // Parse the failed_generation and convert to a proper tool call response.
@@ -529,6 +544,14 @@ impl LlmDriver for OpenAIDriver {
                     continue;
                 }
 
+                warn!(
+                    model = %oai_request.model,
+                    status,
+                    content_type = %content_type,
+                    body_preview = %body_preview,
+                    "OpenAI-compatible request failed before JSON parse"
+                );
+
                 return Err(LlmError::Api {
                     status,
                     message: body,
@@ -539,8 +562,17 @@ impl LlmDriver for OpenAIDriver {
                 .text()
                 .await
                 .map_err(|e| LlmError::Http(e.to_string()))?;
-            let oai_response: OaiResponse =
-                serde_json::from_str(&body).map_err(|e| LlmError::Parse(e.to_string()))?;
+            let oai_response: OaiResponse = serde_json::from_str(&body).map_err(|e| {
+                warn!(
+                    model = %oai_request.model,
+                    status,
+                    content_type = %content_type,
+                    body_preview = %response_body_preview(&body),
+                    parse_error = %e,
+                    "Failed to parse OpenAI-compatible response body"
+                );
+                LlmError::Parse(e.to_string())
+            })?;
 
             let choice = oai_response
                 .choices
@@ -882,6 +914,12 @@ impl LlmDriver for OpenAIDriver {
                 .map_err(|e| LlmError::Http(e.to_string()))?;
 
             let status = resp.status().as_u16();
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
             if status == 429 {
                 if attempt < max_retries {
                     let retry_ms = (attempt + 1) as u64 * 2000;
@@ -896,6 +934,7 @@ impl LlmDriver for OpenAIDriver {
 
             if !resp.status().is_success() {
                 let body = resp.text().await.unwrap_or_default();
+                let body_preview = response_body_preview(&body);
 
                 // Groq "tool_use_failed": parse and recover (streaming path)
                 if status == 400 && body.contains("tool_use_failed") {
@@ -990,6 +1029,14 @@ impl LlmDriver for OpenAIDriver {
                     oai_request.tool_choice = None;
                     continue;
                 }
+
+                warn!(
+                    model = %oai_request.model,
+                    status,
+                    content_type = %content_type,
+                    body_preview = %body_preview,
+                    "OpenAI-compatible streaming request failed before SSE parse"
+                );
 
                 return Err(LlmError::Api {
                     status,

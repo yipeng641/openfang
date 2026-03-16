@@ -3,22 +3,20 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createMemoryHistory } from 'vue-router'
 import { createAppRouter, routes } from './router'
+import { pageCatalog } from './navigation'
 
 beforeAll(() => {
   window.scrollTo = () => {}
 })
 
 describe('router', () => {
-  it('registers lazy-loaded route components', () => {
-    const overviewRoute = routes.find((route) => route.name === 'overview')
-    const analyticsRoute = routes.find((route) => route.name === 'analytics')
-    const runtimeRoute = routes.find((route) => route.name === 'runtime')
-
-    expect(typeof overviewRoute.component).toBe('function')
-    expect(typeof analyticsRoute.component).toBe('function')
-    expect(runtimeRoute.props).toEqual(expect.objectContaining({
-      definition: expect.objectContaining({ title: 'Runtime' }),
-    }))
+  it('registers an explicit lazy-loaded component for every page', () => {
+    for (const page of pageCatalog) {
+      const route = routes.find((candidate) => candidate.name === page.key)
+      expect(route, `missing route for ${page.key}`).toBeTruthy()
+      expect(typeof route.component).toBe('function')
+      expect(route.props).toBeUndefined()
+    }
   })
 
   it('redirects root to agents', async () => {

@@ -10,6 +10,7 @@ const activeTab = ref('sessions')
 const loading = ref(false)
 const memoryLoading = ref(false)
 const sessionSearch = ref('')
+const selectedSessionKeys = ref([])
 const selectedMemoryAgentId = ref('')
 const agents = ref([])
 const sessions = ref([])
@@ -29,6 +30,16 @@ const agentOptions = computed(() => {
 const sessionRows = computed(() => normalizeSessions(sessions.value, agents.value))
 const filteredSessionRows = computed(() => filterSessions(sessionRows.value, sessionSearch.value))
 const memoryRows = computed(() => normalizeMemoryPairs(memoryPairs.value))
+const selectedSessionRows = computed(() => {
+  const selectedKeys = new Set(selectedSessionKeys.value)
+  return sessionRows.value.filter((row) => selectedKeys.has(row.key))
+})
+const sessionRowSelection = computed(() => ({
+  selectedRowKeys: selectedSessionKeys.value,
+  onChange: (keys) => {
+    selectedSessionKeys.value = keys
+  },
+}))
 
 const sessionColumns = [
   { title: 'Session', dataIndex: 'sessionDisplay', key: 'sessionDisplay' },
@@ -102,11 +113,34 @@ async function removeSession(session) {
   if (!window.confirm(`Delete session ${session.sessionDisplay}?`)) return
   try {
     await apiDel(`/api/sessions/${encodeURIComponent(session.sessionId)}`)
+    selectedSessionKeys.value = selectedSessionKeys.value.filter((key) => key !== session.key)
     message.success('Session deleted')
     await loadSessions()
   } catch (error) {
     message.error(`Failed to delete session: ${error.message}`)
   }
+}
+
+async function removeSelectedSessions() {
+  if (!selectedSessionRows.value.length) return
+  const count = selectedSessionRows.value.length
+  if (!window.confirm(`Delete ${count} selected session${count > 1 ? 's' : ''}?`)) return
+
+  const results = await Promise.allSettled(
+    selectedSessionRows.value.map((session) => apiDel(`/api/sessions/${encodeURIComponent(session.sessionId)}`)),
+  )
+
+  const failed = results.filter((result) => result.status === 'rejected')
+  if (failed.length === 0) {
+    message.success(`${count} session${count > 1 ? 's' : ''} deleted`)
+  } else if (failed.length === count) {
+    message.error('Failed to delete selected sessions')
+  } else {
+    message.warning(`Deleted ${count - failed.length} session(s); ${failed.length} failed`)
+  }
+
+  selectedSessionKeys.value = []
+  await loadSessions()
 }
 
 function openCreateModal() {
@@ -197,11 +231,21 @@ onMounted(loadData)
         <div class="mt-1 text-xs text-slate-500">Each conversation with an agent creates a session. Sessions store the full message history so you can resume later or review past interactions.</div>
       </div>
 
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="text-xs text-slate-500">{{ filteredSessionRows.length }} session(s)</div>
+        <div v-if="selectedSessionRows.length" class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-slate-500">{{ selectedSessionRows.length }} selected</span>
+          <a-button size="small" danger @click="removeSelectedSessions">Delete selected</a-button>
+          <a-button size="small" @click="selectedSessionKeys = []">Clear</a-button>
+        </div>
+      </div>
+
       <a-table
         :columns="sessionColumns"
         :data-source="filteredSessionRows"
         :loading="loading"
         :pagination="{ pageSize: 10, hideOnSinglePage: true }"
+        :row-selection="sessionRowSelection"
         row-key="key"
         size="small"
       >

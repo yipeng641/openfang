@@ -15,6 +15,7 @@ const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const isEdit = ref(false)
+const hasStoredApiKey = ref(false)
 const search = ref('')
 const providers = ref([])
 const testing = ref('')
@@ -100,12 +101,14 @@ async function loadProviders() {
 
 function openAdd() {
   isEdit.value = false
+  hasStoredApiKey.value = false
   form.value = { name: '', base_url: '', api_key: '', protocol_type: 'openai' }
   modalOpen.value = true
 }
 
 function openEdit(record) {
   isEdit.value = true
+  hasStoredApiKey.value = record.auth_status === 'configured'
   form.value = {
     name: record.id,
     base_url: record.base_url || '',
@@ -266,7 +269,19 @@ onMounted(loadProviders)
           />
         </a-form-item>
         <a-form-item :label="isEdit ? 'API Key (leave blank to keep current)' : 'API Key (optional)'">
-          <a-input-password v-model:value="form.api_key" placeholder="sk-..." />
+          <div class="space-y-2">
+            <a-alert
+              v-if="isEdit && hasStoredApiKey"
+              type="info"
+              show-icon
+              message="API key is already configured and cannot be shown again."
+              description="Leave this field blank to keep the current key, or enter a new one to replace it."
+            />
+            <a-input-password
+              v-model:value="form.api_key"
+              :placeholder="isEdit && hasStoredApiKey ? 'Enter a new key only if you want to replace the current one' : 'sk-...'"
+            />
+          </div>
         </a-form-item>
       </a-form>
     </a-modal>

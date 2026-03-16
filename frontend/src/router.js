@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { nativePageDefinitions } from './native-pages'
 import { pageCatalog } from './navigation'
 
-const directPageImports = {
+const pageComponents = {
   overview: () => import('./components/OverviewPage.vue'),
   analytics: () => import('./components/AnalyticsPage.vue'),
   comms: () => import('./components/CommsPage.vue'),
@@ -12,20 +11,22 @@ const directPageImports = {
   approvals: () => import('./components/ApprovalsPage.vue'),
   logs: () => import('./components/LogsPage.vue'),
   sessions: () => import('./components/SessionsPage.vue'),
+  workflows: () => import('./components/WorkflowsPage.vue'),
+  scheduler: () => import('./components/SchedulerPage.vue'),
+  channels: () => import('./components/ChannelsPage.vue'),
+  skills: () => import('./components/SkillsPage.vue'),
+  hands: () => import('./components/HandsPage.vue'),
+  runtime: () => import('./components/RuntimePage.vue'),
+  settings: () => import('./components/SettingsPage.vue'),
+  wizard: () => import('./components/WizardPage.vue'),
 }
 
 function resolveRouteComponent(pageKey) {
-  return directPageImports[pageKey] || (() => import('./components/NativeDataPage.vue'))
-}
-
-function resolveRouteProps(pageKey) {
-  if (directPageImports[pageKey]) {
-    return undefined
+  const component = pageComponents[pageKey]
+  if (!component) {
+    throw new Error(`Missing route component for page "${pageKey}"`)
   }
-
-  return {
-    definition: nativePageDefinitions[pageKey],
-  }
+  return component
 }
 
 export const routes = [
@@ -37,7 +38,6 @@ export const routes = [
     path: `/${page.key}`,
     name: page.key,
     component: resolveRouteComponent(page.key),
-    props: resolveRouteProps(page.key),
   })),
   {
     path: '/:pathMatch(.*)*',
