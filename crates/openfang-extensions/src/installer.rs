@@ -221,7 +221,7 @@ pub fn search_integrations(
 /// Generate scaffold files for a new custom integration.
 pub fn scaffold_integration(dir: &std::path::Path) -> ExtensionResult<String> {
     let template = r#"# Custom Integration Template
-# Place this in ~/.openfang/integrations/ or use `openfang add --custom <path>`
+# Place this in ~/.myclaw/integrations/ or use `openfang add --custom <path>`
 
 id = "my-integration"
 name = "My Integration"

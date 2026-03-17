@@ -106,7 +106,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize OpenFang (create ~/.openfang/ and default config).
+    /// Initialize OpenFang (create ~/.myclaw/ and default config).
     Init {
         /// Quick mode: no prompts, just write config + .env (for CI/scripts).
         #[arg(long)]
@@ -455,12 +455,12 @@ enum ConfigCommands {
         /// Dotted key path to remove (e.g. "api.cors_origin").
         key: String,
     },
-    /// Save an API key to ~/.openfang/.env (prompts interactively).
+    /// Save an API key to ~/.myclaw/.env (prompts interactively).
     SetKey {
         /// Provider name (groq, anthropic, openai, gemini, deepseek, etc.).
         provider: String,
     },
-    /// Remove an API key from ~/.openfang/.env.
+    /// Remove an API key from ~/.myclaw/.env.
     DeleteKey {
         /// Provider name.
         provider: String,
@@ -778,12 +778,18 @@ enum SystemCommands {
 }
 
 fn init_tracing_stderr() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    if use_local_log_time() {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .init();
+    }
 }
 
 /// Get the OpenFang home directory, respecting OPENFANG_HOME env var.
@@ -793,7 +799,7 @@ fn cli_openfang_home() -> std::path::PathBuf {
     }
     dirs::home_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join(".openfang")
+        .join(".myclaw")
 }
 
 /// Redirect tracing to a log file so it doesn't corrupt the ratatui TUI.
@@ -804,14 +810,22 @@ fn init_tracing_file() {
 
     match std::fs::File::create(&log_path) {
         Ok(file) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-                )
-                .with_writer(std::sync::Mutex::new(file))
-                .with_ansi(false)
-                .init();
+            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+            if use_local_log_time() {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            } else {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            }
         }
         Err(_) => {
             // Fallback: suppress all output rather than corrupt the TUI
@@ -823,8 +837,88 @@ fn init_tracing_file() {
     }
 }
 
+/// Redirect tracing to daemon.log for persistent logging.
+fn init_tracing_daemon_file() {
+    let log_dir = cli_openfang_home();
+    let _ = std::fs::create_dir_all(&log_dir);
+    let log_path = log_dir.join("daemon.log");
+
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        Ok(file) => {
+            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+            if use_local_log_time() {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            } else {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            }
+        }
+        Err(_) => {
+            // Fallback: log to stderr if file creation fails
+            init_tracing_stderr();
+        }
+    }
+}
+
+/// Redirect tracing to daemon.log for persistent logging of the daemon process.
+fn init_tracing_daemon_file() {
+    let log_dir = cli_openfang_home();
+    let _ = std::fs::create_dir_all(&log_dir);
+    let log_path = log_dir.join("daemon.log");
+
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        Ok(file) => {
+            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+            if use_local_log_time() {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            } else {
+                tracing_subscriber::fmt()
+                    .with_env_filter(env_filter)
+                    .with_writer(std::sync::Mutex::new(file))
+                    .with_ansi(false)
+                    .init();
+            }
+            eprintln!("Daemon logs: {}", log_path.display());
+        }
+        Err(e) => {
+            // Fallback to stderr if log file cannot be opened
+            eprintln!("Warning: Could not open daemon.log: {e}");
+            init_tracing_stderr();
+        }
+    }
+}
+
+fn use_local_log_time() -> bool {
+    std::env::var("OPENFANG_LOG_TZ")
+        .map(|v| v.eq_ignore_ascii_case("local"))
+        .unwrap_or(false)
+}
+
 fn main() {
-    // Load ~/.openfang/.env into process environment (system env takes priority).
+    // Load ~/.myclaw/.env into process environment (system env takes priority).
     dotenv::load_dotenv();
 
     let cli = Cli::parse();
@@ -842,8 +936,13 @@ fn main() {
             Some(Commands::Agent(AgentCommands::Chat { .. }))
         );
 
+    // Daemon mode needs file-based logging for persistent logs
+    let is_daemon_mode = matches!(cli.command, Some(Commands::Start));
+
     if is_tui_mode {
         init_tracing_file();
+    } else if is_daemon_mode {
+        init_tracing_daemon_file();
     } else {
         // CLI subcommands: install Ctrl+C handler for clean interrupt of
         // blocking read_line calls, and trace to stderr.
@@ -1107,7 +1206,7 @@ pub(crate) fn daemon_json(
             if status.is_server_error() {
                 ui::error_with_fix(
                     &format!("Daemon returned error ({})", status),
-                    "Check daemon logs: ~/.openfang/tui.log",
+                    "Check daemon logs: ~/.myclaw/tui.log",
                 );
             }
             body
@@ -1461,6 +1560,10 @@ fn cmd_start(config: Option<PathBuf>) {
         ui::kv("Dashboard", &format!("http://{listen_addr}/"));
         ui::kv("Provider", &provider);
         ui::kv("Model", &model);
+        ui::kv(
+            "Logs",
+            &format!("{}/daemon.log", kernel.config.home_dir.display()),
+        );
         ui::blank();
         ui::hint("Open the dashboard in your browser, or run `openfang chat`");
         ui::hint("Press Ctrl+C to stop the daemon");
@@ -1478,7 +1581,7 @@ fn cmd_start(config: Option<PathBuf>) {
     });
 }
 
-/// Read the api_key from ~/.openfang/config.toml (if any).
+/// Read the api_key from ~/.myclaw/config.toml (if any).
 ///
 /// Returns `None` when the key is missing, empty, or whitespace-only —
 /// meaning the daemon is running in public (unauthenticated) mode.
@@ -3640,7 +3743,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
 
             // Save token to .env
             match dotenv::save_env_key("TELEGRAM_BOT_TOKEN", &token) {
-                Ok(()) => ui::success("Token saved to ~/.openfang/.env"),
+                Ok(()) => ui::success("Token saved to ~/.myclaw/.env"),
                 Err(_) => println!("    export TELEGRAM_BOT_TOKEN={token}"),
             }
 
@@ -3670,7 +3773,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
             maybe_write_channel_config("discord", config_block);
 
             match dotenv::save_env_key("DISCORD_BOT_TOKEN", &token) {
-                Ok(()) => ui::success("Token saved to ~/.openfang/.env"),
+                Ok(()) => ui::success("Token saved to ~/.myclaw/.env"),
                 Err(_) => println!("    export DISCORD_BOT_TOKEN={token}"),
             }
 
@@ -3698,13 +3801,13 @@ fn cmd_channel_setup(channel: Option<&str>) {
 
             if !app_token.is_empty() {
                 match dotenv::save_env_key("SLACK_APP_TOKEN", &app_token) {
-                    Ok(()) => ui::success("App token saved to ~/.openfang/.env"),
+                    Ok(()) => ui::success("App token saved to ~/.myclaw/.env"),
                     Err(_) => println!("    export SLACK_APP_TOKEN={app_token}"),
                 }
             }
             if !bot_token.is_empty() {
                 match dotenv::save_env_key("SLACK_BOT_TOKEN", &bot_token) {
-                    Ok(()) => ui::success("Bot token saved to ~/.openfang/.env"),
+                    Ok(()) => ui::success("Bot token saved to ~/.myclaw/.env"),
                     Err(_) => println!("    export SLACK_BOT_TOKEN={bot_token}"),
                 }
             }
@@ -3738,7 +3841,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
             ] {
                 if !val.is_empty() {
                     match dotenv::save_env_key(key, val) {
-                        Ok(()) => ui::success(&format!("{key} saved to ~/.openfang/.env")),
+                        Ok(()) => ui::success(&format!("{key} saved to ~/.myclaw/.env")),
                         Err(_) => println!("    export {key}={val}"),
                     }
                 }
@@ -3770,7 +3873,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
 
             if !password.is_empty() {
                 match dotenv::save_env_key("EMAIL_PASSWORD", &password) {
-                    Ok(()) => ui::success("Password saved to ~/.openfang/.env"),
+                    Ok(()) => ui::success("Password saved to ~/.myclaw/.env"),
                     Err(_) => println!("    export EMAIL_PASSWORD=your_app_password"),
                 }
             } else {
@@ -3804,7 +3907,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
 
             if !phone.is_empty() {
                 match dotenv::save_env_key("SIGNAL_PHONE", &phone) {
-                    Ok(()) => ui::success("Phone saved to ~/.openfang/.env"),
+                    Ok(()) => ui::success("Phone saved to ~/.myclaw/.env"),
                     Err(_) => println!("    export SIGNAL_PHONE={phone}"),
                 }
             }
@@ -3839,7 +3942,7 @@ fn cmd_channel_setup(channel: Option<&str>) {
             let _ = dotenv::save_env_key("MATRIX_HOMESERVER", &homeserver);
             if !token.is_empty() {
                 match dotenv::save_env_key("MATRIX_ACCESS_TOKEN", &token) {
-                    Ok(()) => ui::success("Token saved to ~/.openfang/.env"),
+                    Ok(()) => ui::success("Token saved to ~/.myclaw/.env"),
                     Err(_) => println!("    export MATRIX_ACCESS_TOKEN={token}"),
                 }
             }
@@ -3939,7 +4042,7 @@ fn cmd_channel_toggle(channel: &str, enable: bool) {
         }
     } else {
         println!("Note: Channel {channel} will be {action} when the daemon starts.");
-        println!("Edit ~/.openfang/config.toml to persist this change.");
+        println!("Edit ~/.myclaw/config.toml to persist this change.");
     }
 }
 
@@ -4656,7 +4759,7 @@ fn cmd_config_set_key(provider: &str) {
 
     match dotenv::save_env_key(&env_var, &key) {
         Ok(()) => {
-            ui::success(&format!("Saved {env_var} to ~/.openfang/.env"));
+            ui::success(&format!("Saved {env_var} to ~/.myclaw/.env"));
             // Test the key
             print!("  Testing key... ");
             io::stdout().flush().unwrap();
@@ -4677,7 +4780,7 @@ fn cmd_config_delete_key(provider: &str) {
     let env_var = provider_to_env_var(provider);
 
     match dotenv::remove_env_key(&env_var) {
-        Ok(()) => ui::success(&format!("Removed {env_var} from ~/.openfang/.env")),
+        Ok(()) => ui::success(&format!("Removed {env_var} from ~/.myclaw/.env")),
         Err(e) => {
             ui::error(&format!("Failed to remove key: {e}"));
             std::process::exit(1);
@@ -4726,7 +4829,7 @@ pub(crate) fn openfang_home() -> PathBuf {
             eprintln!("Error: Could not determine home directory");
             std::process::exit(1);
         })
-        .join(".openfang")
+        .join(".myclaw")
 }
 
 fn prompt_input(prompt: &str) -> String {
@@ -6214,7 +6317,7 @@ fn cmd_uninstall(confirm: bool, keep_config: bool) {
         }
     }
 
-    // Step 6: Remove ~/.openfang/ data
+    // Step 6: Remove ~/.myclaw/ data
     if openfang_dir.exists() {
         if keep_config {
             remove_dir_except_config(&openfang_dir);
@@ -6409,7 +6512,7 @@ fn is_openfang_path_line(line: &str, openfang_dir: &str) -> bool {
         || lower.contains("fish_add_path")
 }
 
-/// Remove everything in ~/.openfang/ except config files.
+/// Remove everything in ~/.myclaw/ except config files.
 fn remove_dir_except_config(openfang_dir: &std::path::Path) {
     let keep = ["config.toml", ".env", "secrets.env"];
     let Ok(entries) = std::fs::read_dir(openfang_dir) else {
@@ -6608,23 +6711,23 @@ args = ["-y", "@modelcontextprotocol/server-github"]
     #[test]
     fn test_uninstall_path_line_filter() {
         use super::is_openfang_path_line;
-        let dir = "/home/user/.openfang/bin";
+        let dir = "/home/user/.myclaw/bin";
 
         // Should match: openfang PATH exports
         assert!(is_openfang_path_line(
-            r#"export PATH="$HOME/.openfang/bin:$PATH""#,
+            r#"export PATH="$HOME/.myclaw/bin:$PATH""#,
             dir
         ));
         assert!(is_openfang_path_line(
-            r#"export PATH="/home/user/.openfang/bin:$PATH""#,
+            r#"export PATH="/home/user/.myclaw/bin:$PATH""#,
             dir
         ));
         assert!(is_openfang_path_line(
-            "set -gx PATH $HOME/.openfang/bin $PATH",
+            "set -gx PATH $HOME/.myclaw/bin $PATH",
             dir
         ));
         assert!(is_openfang_path_line(
-            "fish_add_path $HOME/.openfang/bin",
+            "fish_add_path $HOME/.myclaw/bin",
             dir
         ));
 

@@ -1,6 +1,6 @@
 //! Credential Vault — AES-256-GCM encrypted secret storage.
 //!
-//! Stores secrets in `~/.openfang/vault.enc`, with the master key sourced from
+//! Stores secrets in `~/.myclaw/vault.enc`, with the master key sourced from
 //! the OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service)
 //! or the `OPENFANG_VAULT_KEY` env var for headless/CI environments.
 

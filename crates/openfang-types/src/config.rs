@@ -630,7 +630,7 @@ impl Default for ExtensionsConfig {
 pub struct VaultConfig {
     /// Whether the vault is enabled (auto-detected if vault.enc exists).
     pub enabled: bool,
-    /// Custom vault file path (default: ~/.openfang/vault.enc).
+    /// Custom vault file path (default: ~/.myclaw/vault.enc).
     pub path: Option<PathBuf>,
 }
 
@@ -942,9 +942,9 @@ impl Default for ThinkingConfig {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KernelConfig {
-    /// OpenFang home directory (default: ~/.openfang).
+    /// OpenFang home directory (default: ~/.myclaw).
     pub home_dir: PathBuf,
-    /// Data directory for databases (default: ~/.openfang/data).
+    /// Data directory for databases (default: ~/.myclaw/data).
     pub data_dir: PathBuf,
     /// Log level (trace, debug, info, warn, error).
     pub log_level: String,
@@ -999,7 +999,7 @@ pub struct KernelConfig {
     /// Credential vault configuration.
     #[serde(default)]
     pub vault: VaultConfig,
-    /// Root directory for agent workspaces. Default: `~/.openfang/workspaces`
+    /// Root directory for agent workspaces. Default: `~/.myclaw/workspaces`
     #[serde(default)]
     pub workspaces_dir: Option<PathBuf>,
     /// Media understanding configuration.
@@ -1379,18 +1379,18 @@ impl std::fmt::Debug for KernelConfig {
 
 /// Resolve the OpenFang home directory.
 ///
-/// Priority: `OPENFANG_HOME` env var > `~/.openfang`.
+/// Priority: `OPENFANG_HOME` env var > `~/.myclaw`.
 fn openfang_home_dir() -> PathBuf {
     if let Ok(home) = std::env::var("OPENFANG_HOME") {
         return PathBuf::from(home);
     }
     dirs::home_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join(".openfang")
+        .join(".myclaw")
 }
 
 /// Default LLM model configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct DefaultModelConfig {
     /// Provider name (e.g., "anthropic", "openai").
@@ -1401,17 +1401,6 @@ pub struct DefaultModelConfig {
     pub api_key_env: String,
     /// Optional base URL override.
     pub base_url: Option<String>,
-}
-
-impl Default for DefaultModelConfig {
-    fn default() -> Self {
-        Self {
-            provider: String::new(),
-            model: String::new(),
-            api_key_env: String::new(),
-            base_url: None,
-        }
-    }
 }
 
 /// Memory substrate configuration.

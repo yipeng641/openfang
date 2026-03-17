@@ -4,7 +4,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, PaperClipOutlined, PlusOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue'
-import { apiGet, apiPost, apiPut } from '../api'
+import { apiGet, apiPost, apiPut, openAgentSocket } from '../api'
 import { normalizeItems } from '../data-utils'
 
 const loading = ref(false)
@@ -24,8 +24,11 @@ const messageListRef = ref(null)
 const fileInputRef = ref(null)
 const shouldAutoScroll = ref(true)
 const hasUnreadMessages = ref(false)
-let refreshTimer = null
+const wsConnected = ref(false)
 let localMessageSequence = 0
+let agentSocket = null
+let socketAgentId = ''
+let streamingMessageId = ''
 const AUTO_SCROLL_THRESHOLD = 80
 
 const fallbackSlashCommands = [
@@ -166,8 +169,69 @@ function pushLocalMessage(payload, options) {
   localMessages.value = [...localMessages.value, createLocalMessage(payload, options)]
 }
 
+function updateLocalMessage(messageId, updater) {
+  localMessages.value = localMessages.value.map((entry) => {
+    if (entry.id !== messageId) return entry
+    return typeof updater === 'function' ? updater(entry) : { ...entry, ...updater }
+  })
+}
+
+function removeLocalMessage(messageId) {
+  localMessages.value = localMessages.value.filter((entry) => entry.id !== messageId)
+}
+
 function clearSyncedLocalMessages() {
   localMessages.value = localMessages.value.filter((entry) => !entry.clearOnSync)
+}
+
+function clearStreamingMessage() {
+  if (!streamingMessageId) return
+  removeLocalMessage(streamingMessageId)
+  streamingMessageId = ''
+}
+
+function ensureStreamingMessage(initialContent = 'Processing...') {
+  if (streamingMessageId) {
+    return streamingMessageId
+  }
+  const entry = createLocalMessage(
+    {
+      role: 'assistant',
+      content: initialContent,
+      text: initialContent,
+      streaming: true,
+    },
+    { clearOnSync: true },
+  )
+  localMessages.value = [...localMessages.value, entry]
+  streamingMessageId = entry.id
+  return streamingMessageId
+}
+
+function setStreamingMessageContent(nextContent, extra = {}) {
+  const messageId = ensureStreamingMessage(nextContent)
+  updateLocalMessage(messageId, (entry) => ({
+    ...entry,
+    content: nextContent,
+    text: nextContent,
+    ...extra,
+  }))
+}
+
+function appendStreamingMessageContent(chunk) {
+  const messageId = ensureStreamingMessage('')
+  updateLocalMessage(messageId, (entry) => {
+    const previous = entry.text || entry.content || ''
+    const shouldReplaceStatusText =
+      previous === 'Processing...' || previous.startsWith('Using ')
+    const nextContent = shouldReplaceStatusText ? chunk : `${previous}${chunk}`
+    return {
+      ...entry,
+      content: nextContent,
+      text: nextContent,
+      streaming: true,
+    }
+  })
 }
 
 function buildAttachmentSummary(items) {
@@ -266,6 +330,137 @@ async function loadData() {
     message.error(`Failed to load chat page: ${error.message}`)
   } finally {
     loading.value = false
+  }
+}
+
+function disconnectAgentSocket() {
+  if (agentSocket) {
+    agentSocket.close()
+    agentSocket = null
+  }
+  socketAgentId = ''
+  wsConnected.value = false
+}
+
+async function syncCurrentSessionAfterPush() {
+  try {
+    await loadCurrentSession({ forceScroll: true })
+  } finally {
+    sending.value = false
+  }
+}
+
+async function handleSocketMessage(payload) {
+  switch (payload?.type) {
+    case 'connected':
+      return
+    case 'typing':
+      if (payload.state === 'start') {
+        setStreamingMessageContent('Processing...', { streaming: true })
+      } else if (payload.state === 'tool') {
+        setStreamingMessageContent(`Using ${payload.tool || 'tool'}...`, { streaming: true })
+      }
+      scheduleMessageScroll('smooth')
+      return
+    case 'text_delta':
+      appendStreamingMessageContent(payload.content || '')
+      scheduleMessageScroll('smooth')
+      return
+    case 'response':
+      pendingAttachments.value = []
+      if (payload.content) {
+        setStreamingMessageContent(payload.content, { streaming: false })
+      }
+      await syncCurrentSessionAfterPush()
+      return
+    case 'silent_complete':
+      pendingAttachments.value = []
+      await syncCurrentSessionAfterPush()
+      return
+    case 'error':
+      clearStreamingMessage()
+      sending.value = false
+      pushLocalMessage(
+        {
+          role: 'system',
+          content: `Error: ${payload.content || 'Unknown WebSocket error'}`,
+        },
+        { clearOnSync: false },
+      )
+      scheduleMessageScroll('smooth', { force: true })
+      return
+    case 'command_result':
+      pushLocalMessage(
+        {
+          role: 'system',
+          content: payload.message || 'Command executed.',
+        },
+        { clearOnSync: false },
+      )
+      scheduleMessageScroll('smooth', { force: true })
+      return
+    case 'agents_updated':
+      if (Array.isArray(payload.agents)) {
+        agents.value = payload.agents
+      }
+      return
+    default:
+      return
+  }
+}
+
+async function ensureAgentSocket(agentId) {
+  if (!agentId) {
+    disconnectAgentSocket()
+    return false
+  }
+
+  if (agentSocket && socketAgentId === String(agentId)) {
+    if (agentSocket.isOpen()) {
+      return true
+    }
+    try {
+      await agentSocket.connect()
+      return agentSocket.isOpen()
+    } catch {
+      return false
+    }
+  }
+
+  disconnectAgentSocket()
+  const nextAgentId = String(agentId)
+  socketAgentId = nextAgentId
+
+  agentSocket = openAgentSocket(nextAgentId, {
+    onOpen: () => {
+      if (selectedAgentId.value !== nextAgentId) return
+      wsConnected.value = true
+      void loadCurrentSession({ forceScroll: !serverMessages.value.length })
+    },
+    onMessage: (payload) => {
+      if (selectedAgentId.value !== nextAgentId) return
+      void handleSocketMessage(payload)
+    },
+    onClose: (_event, meta) => {
+      if (selectedAgentId.value !== nextAgentId) return
+      wsConnected.value = false
+      if (!meta?.willReconnect) {
+        agentSocket = null
+        socketAgentId = ''
+      }
+    },
+    onError: () => {
+      if (selectedAgentId.value !== nextAgentId) return
+      wsConnected.value = false
+    },
+  })
+
+  try {
+    await agentSocket.connect()
+    return agentSocket.isOpen()
+  } catch {
+    wsConnected.value = false
+    return false
   }
 }
 
@@ -557,6 +752,20 @@ async function sendMessage() {
   scheduleMessageScroll('smooth', { force: true })
 
   try {
+    const wsReady = await ensureAgentSocket(selectedAgentId.value)
+    if (wsReady && agentSocket?.send({
+      type: 'message',
+      content: text,
+      attachments: attachmentSnapshot.map((item) => ({
+        file_id: item.file_id,
+        filename: item.filename,
+        content_type: item.content_type,
+      })),
+    })) {
+      pendingAttachments.value = []
+      return
+    }
+
     const data = await apiPost(`/api/agents/${encodeURIComponent(selectedAgentId.value)}/message`, {
       message: text,
       attachments: attachmentSnapshot.map((item) => ({
@@ -581,31 +790,22 @@ async function sendMessage() {
     input.value = text
     message.error(`Send failed: ${error.message}`)
   } finally {
-    sending.value = false
-  }
-}
-
-function startAutoRefresh() {
-  stopAutoRefresh()
-  refreshTimer = window.setInterval(() => {
-    if (!selectedAgentId.value || sending.value) return
-    loadCurrentSession()
-  }, 4000)
-}
-
-function stopAutoRefresh() {
-  if (refreshTimer) {
-    window.clearInterval(refreshTimer)
-    refreshTimer = null
+    if (!agentSocket?.isOpen()) {
+      sending.value = false
+    }
   }
 }
 
 watch(selectedAgentId, async () => {
+  disconnectAgentSocket()
+  clearStreamingMessage()
+  sending.value = false
   hasUnreadMessages.value = false
   shouldAutoScroll.value = true
   localMessages.value = []
   pendingAttachments.value = []
   await loadCurrentSession({ forceScroll: true })
+  await ensureAgentSocket(selectedAgentId.value)
 })
 
 watch(() => normalizedMessages.value.length, (nextLength, previousLength) => {
@@ -616,11 +816,10 @@ watch(() => normalizedMessages.value.length, (nextLength, previousLength) => {
 
 onMounted(async () => {
   await loadData()
-  startAutoRefresh()
 })
 
 onBeforeUnmount(() => {
-  stopAutoRefresh()
+  disconnectAgentSocket()
 })
 </script>
 
@@ -670,6 +869,7 @@ onBeforeUnmount(() => {
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <a-tag color="blue">{{ normalizedMessages.length }} Messages</a-tag>
               <a-tag v-if="pendingAttachments.length" color="gold">{{ pendingAttachments.length }} Attachments</a-tag>
+              <a-tag :color="wsConnected ? 'green' : 'default'">{{ wsConnected ? 'Live' : 'Offline' }}</a-tag>
             </div>
           </div>
 

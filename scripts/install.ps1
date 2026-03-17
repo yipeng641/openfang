@@ -9,7 +9,7 @@
 $ErrorActionPreference = 'Stop'
 
 $Repo = "RightNow-AI/openfang"
-$DefaultInstallDir = Join-Path $env:USERPROFILE ".openfang\bin"
+$DefaultInstallDir = Join-Path $env:USERPROFILE ".myclaw\bin"
 $InstallDir = if ($env:OPENFANG_INSTALL_DIR) { $env:OPENFANG_INSTALL_DIR } else { $DefaultInstallDir }
 
 function Write-Banner {

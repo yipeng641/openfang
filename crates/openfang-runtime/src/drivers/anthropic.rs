@@ -11,7 +11,7 @@ use openfang_types::message::{
 };
 use openfang_types::tool::ToolCall;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 use zeroize::Zeroizing;
 
 /// Anthropic Claude API driver.
@@ -203,6 +203,7 @@ impl LlmDriver for AnthropicDriver {
         for attempt in 0..=max_retries {
             let url = format!("{}/v1/messages", self.base_url);
             debug!(url = %url, attempt, "Sending Anthropic API request");
+            trace!("Full Anthropic request payload:\n{}", serde_json::to_string_pretty(&api_request).unwrap_or_default());
 
             let resp = self
                 .client
@@ -310,6 +311,7 @@ impl LlmDriver for AnthropicDriver {
         for attempt in 0..=max_retries {
             let url = format!("{}/v1/messages", self.base_url);
             debug!(url = %url, attempt, "Sending Anthropic streaming request");
+            trace!("Full Anthropic streaming request payload:\n{}", serde_json::to_string_pretty(&api_request).unwrap_or_default());
 
             let resp = self
                 .client

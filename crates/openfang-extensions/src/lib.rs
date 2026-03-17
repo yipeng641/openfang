@@ -222,7 +222,7 @@ pub struct InstalledIntegration {
     pub config: HashMap<String, String>,
 }
 
-/// Top-level structure for `~/.openfang/integrations.toml`.
+/// Top-level structure for `~/.myclaw/integrations.toml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IntegrationsFile {
     #[serde(default)]

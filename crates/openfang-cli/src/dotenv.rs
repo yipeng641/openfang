@@ -1,4 +1,4 @@
-//! Minimal `.env` file loader/saver for `~/.openfang/.env`.
+//! Minimal `.env` file loader/saver for `~/.myclaw/.env`.
 //!
 //! No external crate needed — hand-rolled for simplicity.
 //! Format: `KEY=VALUE` lines, `#` comments, optional quotes.
@@ -11,15 +11,15 @@ fn dotenv_openfang_home() -> Option<PathBuf> {
     if let Ok(home) = std::env::var("OPENFANG_HOME") {
         return Some(PathBuf::from(home));
     }
-    dirs::home_dir().map(|h| h.join(".openfang"))
+    dirs::home_dir().map(|h| h.join(".myclaw"))
 }
 
-/// Return the path to `~/.openfang/.env`.
+/// Return the path to `~/.myclaw/.env`.
 pub fn env_file_path() -> Option<PathBuf> {
     dotenv_openfang_home().map(|h| h.join(".env"))
 }
 
-/// Load `~/.openfang/.env` and `~/.openfang/secrets.env` into `std::env`.
+/// Load `~/.myclaw/.env` and `~/.myclaw/secrets.env` into `std::env`.
 ///
 /// System env vars take priority — existing vars are NOT overridden.
 /// `secrets.env` is loaded second so `.env` values take priority over secrets
@@ -31,7 +31,7 @@ pub fn load_dotenv() {
     load_env_file(secrets_env_path());
 }
 
-/// Return the path to `~/.openfang/secrets.env`.
+/// Return the path to `~/.myclaw/secrets.env`.
 pub fn secrets_env_path() -> Option<PathBuf> {
     dotenv_openfang_home().map(|h| h.join("secrets.env"))
 }
@@ -61,7 +61,7 @@ fn load_env_file(path: Option<PathBuf>) {
     }
 }
 
-/// Upsert a key in `~/.openfang/.env`.
+/// Upsert a key in `~/.myclaw/.env`.
 ///
 /// Creates the file if missing. Sets 0600 permissions on Unix.
 /// Also sets the key in the current process environment.
@@ -83,7 +83,7 @@ pub fn save_env_key(key: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Remove a key from `~/.openfang/.env`.
+/// Remove a key from `~/.myclaw/.env`.
 ///
 /// Also removes it from the current process environment.
 pub fn remove_env_key(key: &str) -> Result<(), String> {
@@ -98,7 +98,7 @@ pub fn remove_env_key(key: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// List key names (without values) from `~/.openfang/.env`.
+/// List key names (without values) from `~/.myclaw/.env`.
 #[allow(dead_code)]
 pub fn list_env_keys() -> Vec<String> {
     let path = match env_file_path() {

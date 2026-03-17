@@ -157,6 +157,7 @@ pub struct OpenFangKernel {
     /// session corruption when multiple messages arrive concurrently (e.g. rapid voice
     /// messages via Telegram). Different agents can still run in parallel.
     agent_msg_locks: dashmap::DashMap<AgentId, Arc<tokio::sync::Mutex<()>>>,
+    executing_agents: dashmap::DashMap<AgentId, ()>,
     /// Weak self-reference for trigger dispatch (set after Arc wrapping).
     self_handle: OnceLock<Weak<OpenFangKernel>>,
 }
@@ -706,7 +707,7 @@ impl OpenFangKernel {
         if !config.provider_protocols.is_empty() {
             model_catalog.apply_protocol_overrides(&config.provider_protocols);
         }
-        // Load user's custom models from ~/.openfang/custom_models.json
+        // Load user's custom models from ~/.myclaw/custom_models.json
         let custom_models_path = config.home_dir.join("custom_models.json");
         model_catalog.load_custom_models(&custom_models_path);
         let available_count = model_catalog.available_models().len();
@@ -1010,6 +1011,7 @@ impl OpenFangKernel {
             channel_adapters: dashmap::DashMap::new(),
             default_model_override: std::sync::RwLock::new(None),
             agent_msg_locks: dashmap::DashMap::new(),
+            executing_agents: dashmap::DashMap::new(),
             self_handle: OnceLock::new(),
         };
 
@@ -1467,6 +1469,7 @@ impl OpenFangKernel {
         let entry = self.registry.get(agent_id).ok_or_else(|| {
             KernelError::OpenFang(OpenFangError::AgentNotFound(agent_id.to_string()))
         })?;
+        self.executing_agents.insert(agent_id, ());
 
         // Dispatch based on module type
         let result = if entry.manifest.module.starts_with("wasm:") {
@@ -1482,6 +1485,7 @@ impl OpenFangKernel {
 
         match result {
             Ok(result) => {
+                self.executing_agents.remove(&agent_id);
                 // Record token usage for quota tracking
                 self.scheduler.record_usage(agent_id, &result.total_usage);
 
@@ -1502,6 +1506,7 @@ impl OpenFangKernel {
                 Ok(result)
             }
             Err(e) => {
+                self.executing_agents.remove(&agent_id);
                 // SECURITY: Record failed message in audit trail
                 self.audit_log.record(
                     agent_id.to_string(),
@@ -1553,6 +1558,7 @@ impl OpenFangKernel {
             let kernel_clone = Arc::clone(self);
             let message_owned = message.to_string();
             let entry_clone = entry.clone();
+            self.executing_agents.insert(agent_id, ());
 
             let handle = tokio::spawn(async move {
                 let result = if is_wasm {
@@ -1567,6 +1573,7 @@ impl OpenFangKernel {
 
                 match result {
                     Ok(result) => {
+                        kernel_clone.executing_agents.remove(&agent_id);
                         // Emit the complete response as a single text delta
                         let _ = tx
                             .send(StreamEvent::TextDelta {
@@ -1588,6 +1595,7 @@ impl OpenFangKernel {
                         Ok(result)
                     }
                     Err(e) => {
+                        kernel_clone.executing_agents.remove(&agent_id);
                         kernel_clone.supervisor.record_panic();
                         warn!(agent_id = %agent_id, error = %e, "Non-LLM agent failed");
                         Err(e)
@@ -1781,6 +1789,7 @@ impl OpenFangKernel {
             message.to_string()
         };
         let kernel_clone = Arc::clone(self);
+        self.executing_agents.insert(agent_id, ());
 
         let handle = tokio::spawn(async move {
             // Auto-compact if the session is large before running the loop
@@ -1919,14 +1928,16 @@ impl OpenFangKernel {
                         }
                     }
 
-                    Ok(result)
-                }
-                Err(e) => {
-                    kernel_clone.supervisor.record_panic();
-                    warn!(agent_id = %agent_id, error = %e, "Streaming agent loop failed");
-                    Err(KernelError::OpenFang(e))
-                }
+                    kernel_clone.executing_agents.remove(&agent_id);
+                Ok(result)
             }
+            Err(e) => {
+                kernel_clone.executing_agents.remove(&agent_id);
+                kernel_clone.supervisor.record_panic();
+                warn!(agent_id = %agent_id, error = %e, "Streaming agent loop failed");
+                Err(KernelError::OpenFang(e))
+            }
+        }
         });
 
         // Store abort handle for cancellation support
@@ -4033,7 +4044,7 @@ impl OpenFangKernel {
                     break;
                 }
 
-                let statuses = check_agents(&kernel.registry, &config);
+                let statuses = check_agents(&kernel.registry, &kernel.executing_agents, &config);
                 for status in &statuses {
                     // Skip agents in quiet hours (per-agent config)
                     if let Some(entry) = kernel.registry.get(status.agent_id) {

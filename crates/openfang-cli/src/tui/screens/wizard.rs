@@ -159,7 +159,7 @@ pub fn needs_setup() -> bool {
         std::path::PathBuf::from(h)
     } else {
         match dirs::home_dir() {
-            Some(h) => h.join(".openfang"),
+            Some(h) => h.join(".myclaw"),
             None => return true,
         }
     };
@@ -378,7 +378,7 @@ impl WizardState {
             std::path::PathBuf::from(h)
         } else {
             match dirs::home_dir() {
-                Some(h) => h.join(".openfang"),
+                Some(h) => h.join(".myclaw"),
                 None => {
                     self.status_msg = "Could not determine home directory".to_string();
                     self.step = WizardStep::Done;

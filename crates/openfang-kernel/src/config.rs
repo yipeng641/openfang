@@ -1,4 +1,4 @@
-//! Configuration loading from `~/.openfang/config.toml` with defaults.
+//! Configuration loading from `~/.myclaw/config.toml` with defaults.
 //!
 //! Supports config includes: the `include` field specifies additional TOML files
 //! to load and deep-merge before the root config (root overrides includes).
@@ -251,14 +251,14 @@ pub fn default_config_path() -> PathBuf {
 
 /// Get the OpenFang home directory.
 ///
-/// Priority: `OPENFANG_HOME` env var > `~/.openfang`.
+/// Priority: `OPENFANG_HOME` env var > `~/.myclaw`.
 pub fn openfang_home() -> PathBuf {
     if let Ok(home) = std::env::var("OPENFANG_HOME") {
         return PathBuf::from(home);
     }
     dirs::home_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join(".openfang")
+        .join(".myclaw")
 }
 
 #[cfg(test)]

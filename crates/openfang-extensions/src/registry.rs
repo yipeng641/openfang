@@ -1,7 +1,7 @@
 //! Integration Registry — manages bundled + installed integration templates.
 //!
 //! Loads 25 bundled MCP server templates at compile time, merges with user's
-//! installed state from `~/.openfang/integrations.toml`, and converts installed
+//! installed state from `~/.myclaw/integrations.toml`, and converts installed
 //! integrations to `McpServerConfigEntry` for kernel consumption.
 
 use crate::{

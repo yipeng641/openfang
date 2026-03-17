@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 
 /// The unified memory substrate. Implements the `Memory` trait by delegating
 /// to specialized stores backed by a shared SQLite connection.
+#[derive(Clone)]
 pub struct MemorySubstrate {
     conn: Arc<Mutex<Connection>>,
     structured: StructuredStore,

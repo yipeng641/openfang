@@ -121,11 +121,11 @@ impl MigrationReport {
 
         // Next steps
         out.push_str("## Next Steps\n\n");
-        out.push_str("1. Review imported agent manifests in `~/.openfang/agents/`\n");
+        out.push_str("1. Review imported agent manifests in `~/.myclaw/agents/`\n");
         out.push_str(
-            "2. Review `~/.openfang/secrets.env` — verify tokens were migrated correctly\n",
+            "2. Review `~/.myclaw/secrets.env` — verify tokens were migrated correctly\n",
         );
-        out.push_str("3. Set any remaining API keys referenced in `~/.openfang/config.toml`\n");
+        out.push_str("3. Set any remaining API keys referenced in `~/.myclaw/config.toml`\n");
         out.push_str("4. Start the daemon: `openfang start`\n");
         out.push_str("5. Test your agents: `openfang agent list`\n");
 
@@ -192,7 +192,7 @@ mod tests {
             imported: vec![MigrateItem {
                 kind: ItemKind::Agent,
                 name: "coder".to_string(),
-                destination: "~/.openfang/agents/coder/agent.toml".to_string(),
+                destination: "~/.myclaw/agents/coder/agent.toml".to_string(),
             }],
             skipped: vec![SkippedItem {
                 kind: ItemKind::Skill,

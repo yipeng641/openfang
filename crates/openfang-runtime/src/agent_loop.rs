@@ -70,6 +70,23 @@ pub fn strip_provider_prefix(model: &str, provider: &str) -> String {
 /// Default context window size (tokens) for token-based trimming.
 const DEFAULT_CONTEXT_WINDOW: usize = 200_000;
 
+fn spawn_background_remember(memory: MemorySubstrate, agent_id: openfang_types::agent::AgentId, interaction_text: String) {
+    tokio::spawn(async move {
+        if let Err(e) = memory
+            .remember(
+                agent_id,
+                &interaction_text,
+                MemorySource::Conversation,
+                "episodic",
+                HashMap::new(),
+            )
+            .await
+        {
+            warn!("Background remember failed: {e}");
+        }
+    });
+}
+
 /// Agent lifecycle phase within the execution loop.
 /// Used for UX indicators (typing, reactions) without coupling to channel types.
 #[derive(Debug, Clone, PartialEq)]
@@ -456,49 +473,13 @@ pub async fn run_agent_loop(
                     .save_session(session)
                     .map_err(|e| OpenFangError::Memory(e.to_string()))?;
 
-                // Remember this interaction (with embedding if available)
+                // Save conversational memory in the background so a slow or
+                // unavailable embedding backend does not delay the user-visible reply.
                 let interaction_text = format!(
                     "User asked: {}\nI responded: {}",
                     user_message, final_response
                 );
-                if let Some(emb) = embedding_driver {
-                    match emb.embed_one(&interaction_text).await {
-                        Ok(vec) => {
-                            let _ = memory
-                                .remember_with_embedding_async(
-                                    session.agent_id,
-                                    &interaction_text,
-                                    MemorySource::Conversation,
-                                    "episodic",
-                                    HashMap::new(),
-                                    Some(&vec),
-                                )
-                                .await;
-                        }
-                        Err(e) => {
-                            warn!("Embedding for remember failed: {e}");
-                            let _ = memory
-                                .remember(
-                                    session.agent_id,
-                                    &interaction_text,
-                                    MemorySource::Conversation,
-                                    "episodic",
-                                    HashMap::new(),
-                                )
-                                .await;
-                        }
-                    }
-                } else {
-                    let _ = memory
-                        .remember(
-                            session.agent_id,
-                            &interaction_text,
-                            MemorySource::Conversation,
-                            "episodic",
-                            HashMap::new(),
-                        )
-                        .await;
-                }
+                spawn_background_remember(memory.clone(), session.agent_id, interaction_text);
 
                 // Notify phase: Done
                 if let Some(cb) = on_phase {
@@ -1435,49 +1416,13 @@ pub async fn run_agent_loop_streaming(
                     .save_session(session)
                     .map_err(|e| OpenFangError::Memory(e.to_string()))?;
 
-                // Remember this interaction (with embedding if available)
+                // Save conversational memory in the background so a slow or
+                // unavailable embedding backend does not delay the user-visible reply.
                 let interaction_text = format!(
                     "User asked: {}\nI responded: {}",
                     user_message, final_response
                 );
-                if let Some(emb) = embedding_driver {
-                    match emb.embed_one(&interaction_text).await {
-                        Ok(vec) => {
-                            let _ = memory
-                                .remember_with_embedding_async(
-                                    session.agent_id,
-                                    &interaction_text,
-                                    MemorySource::Conversation,
-                                    "episodic",
-                                    HashMap::new(),
-                                    Some(&vec),
-                                )
-                                .await;
-                        }
-                        Err(e) => {
-                            warn!("Embedding for remember failed (streaming): {e}");
-                            let _ = memory
-                                .remember(
-                                    session.agent_id,
-                                    &interaction_text,
-                                    MemorySource::Conversation,
-                                    "episodic",
-                                    HashMap::new(),
-                                )
-                                .await;
-                        }
-                    }
-                } else {
-                    let _ = memory
-                        .remember(
-                            session.agent_id,
-                            &interaction_text,
-                            MemorySource::Conversation,
-                            "episodic",
-                            HashMap::new(),
-                        )
-                        .await;
-                }
+                spawn_background_remember(memory.clone(), session.agent_id, interaction_text);
 
                 // Notify phase: Done
                 if let Some(cb) = on_phase {

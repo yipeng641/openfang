@@ -7,6 +7,7 @@
 
 use crate::registry::AgentRegistry;
 use chrono::Utc;
+use dashmap::DashMap;
 use openfang_types::agent::{AgentId, AgentState};
 use tracing::{debug, warn};
 
@@ -53,13 +54,21 @@ impl Default for HeartbeatConfig {
 ///
 /// This is a pure function — it doesn't start a background task.
 /// The caller (kernel) can run this periodically or in a background task.
-pub fn check_agents(registry: &AgentRegistry, config: &HeartbeatConfig) -> Vec<HeartbeatStatus> {
+pub fn check_agents(
+    registry: &AgentRegistry,
+    executing_agents: &DashMap<AgentId, ()>,
+    config: &HeartbeatConfig,
+) -> Vec<HeartbeatStatus> {
     let now = Utc::now();
     let mut statuses = Vec::new();
 
     for entry_ref in registry.list() {
         // Only check running agents
         if entry_ref.state != AgentState::Running {
+            continue;
+        }
+
+        if !executing_agents.contains_key(&entry_ref.id) {
             continue;
         }
 

@@ -3,13 +3,13 @@
 # Usage: curl -sSf https://openfang.sh | sh
 #
 # Environment variables:
-#   OPENFANG_INSTALL_DIR  — custom install directory (default: ~/.openfang/bin)
+#   OPENFANG_INSTALL_DIR  — custom install directory (default: ~/.myclaw/bin)
 #   OPENFANG_VERSION      — install a specific version tag (default: latest)
 
 set -euo pipefail
 
 REPO="RightNow-AI/openfang"
-INSTALL_DIR="${OPENFANG_INSTALL_DIR:-$HOME/.openfang/bin}"
+INSTALL_DIR="${OPENFANG_INSTALL_DIR:-$HOME/.myclaw/bin}"
 
 detect_platform() {
     OS=$(uname -s | tr '[:upper:]' '[:lower:]')

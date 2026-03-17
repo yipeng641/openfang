@@ -1,6 +1,6 @@
 //! WhatsApp Web gateway — embedded Node.js process management.
 //!
-//! Embeds the gateway JS at compile time, extracts it to `~/.openfang/whatsapp-gateway/`,
+//! Embeds the gateway JS at compile time, extracts it to `~/.myclaw/whatsapp-gateway/`,
 //! runs `npm install` if needed, and spawns `node index.js` as a managed child process
 //! that auto-restarts on crash.
 

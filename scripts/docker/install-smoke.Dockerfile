@@ -47,8 +47,8 @@ RUN if [ "$OPENFANG_SMOKE_FULL" = "1" ]; then \
     fi
 
 # If full install succeeded, verify the binary works
-RUN if [ "$OPENFANG_SMOKE_FULL" = "1" ] && [ -f "$HOME/.openfang/bin/openfang" ]; then \
-        $HOME/.openfang/bin/openfang --version && \
+RUN if [ "$OPENFANG_SMOKE_FULL" = "1" ] && [ -f "$HOME/.myclaw/bin/openfang" ]; then \
+        $HOME/.myclaw/bin/openfang --version && \
         echo "PASS: openfang binary works"; \
     else \
         echo "SKIP: binary verification (no full install)"; \

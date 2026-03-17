@@ -10,8 +10,13 @@ use openfang_types::model_catalog::{
     OPENAI_BASE_URL, TOGETHER_BASE_URL, VLLM_BASE_URL,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tracing::{debug, warn};
 use zeroize::Zeroizing;
+
+/// Keep embedding failures from dominating end-user latency when the local
+/// embedding service is unavailable or unhealthy.
+const EMBEDDING_HTTP_TIMEOUT_SECS: u64 = 2;
 
 /// Error type for embedding operations.
 #[derive(Debug, thiserror::Error)]
@@ -96,7 +101,10 @@ impl OpenAIEmbeddingDriver {
             api_key: Zeroizing::new(config.api_key),
             base_url: config.base_url,
             model: config.model,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(EMBEDDING_HTTP_TIMEOUT_SECS))
+                .build()
+                .map_err(|e| EmbeddingError::Http(e.to_string()))?,
             dims,
         })
     }

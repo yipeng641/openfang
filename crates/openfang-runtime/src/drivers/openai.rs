@@ -9,7 +9,7 @@ use futures::StreamExt;
 use openfang_types::message::{ContentBlock, MessageContent, Role, StopReason, TokenUsage};
 use openfang_types::tool::ToolCall;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 use zeroize::Zeroizing;
 
 /// OpenAI-compatible API driver.
@@ -416,6 +416,7 @@ impl LlmDriver for OpenAIDriver {
         for attempt in 0..=max_retries {
             let url = format!("{}/chat/completions", self.base_url);
             debug!(url = %url, attempt, "Sending OpenAI API request");
+            trace!("Full OpenAI request payload:\n{}", serde_json::to_string_pretty(&oai_request).unwrap_or_default());
 
             let mut req_builder = self
                 .client
@@ -893,6 +894,7 @@ impl LlmDriver for OpenAIDriver {
         for attempt in 0..=max_retries {
             let url = format!("{}/chat/completions", self.base_url);
             debug!(url = %url, attempt, "Sending OpenAI streaming request");
+            trace!("Full OpenAI streaming request payload:\n{}", serde_json::to_string_pretty(&oai_request).unwrap_or_default());
 
             let mut req_builder = self
                 .client

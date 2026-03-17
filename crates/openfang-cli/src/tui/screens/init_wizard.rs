@@ -952,7 +952,7 @@ fn handle_migration_key(
                     } else {
                         dirs::home_dir()
                             .unwrap_or_else(|| PathBuf::from("."))
-                            .join(".openfang")
+                            .join(".myclaw")
                     };
                     let tx = migrate_tx.clone();
                     std::thread::spawn(move || {
@@ -1076,7 +1076,7 @@ fn save_config(state: &mut State) {
         PathBuf::from(h)
     } else {
         match dirs::home_dir() {
-            Some(h) => h.join(".openfang"),
+            Some(h) => h.join(".myclaw"),
             None => {
                 state.save_error = "Could not determine home directory".to_string();
                 return;
@@ -1825,7 +1825,7 @@ fn draw_api_key(f: &mut Frame, area: Rect, state: &mut State) {
             );
             f.render_widget(
                 Paragraph::new(Line::from(vec![Span::styled(
-                    "    Saved to ~/.openfang/.env",
+                    "    Saved to ~/.myclaw/.env",
                     theme::dim_style(),
                 )])),
                 chunks[3],
@@ -1841,7 +1841,7 @@ fn draw_api_key(f: &mut Frame, area: Rect, state: &mut State) {
             );
             f.render_widget(
                 Paragraph::new(Line::from(vec![Span::styled(
-                    "    Saved to ~/.openfang/.env",
+                    "    Saved to ~/.myclaw/.env",
                     theme::dim_style(),
                 )])),
                 chunks[3],
