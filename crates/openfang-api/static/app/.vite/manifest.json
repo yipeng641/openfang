@@ -1,6 +1,6 @@
 {
-  "_ApiOutlined-BUf9OTx_.js": {
-    "file": "assets/ApiOutlined-BUf9OTx_.js",
+  "_ApiOutlined-DlPrMar-.js": {
+    "file": "assets/ApiOutlined-DlPrMar-.js",
     "name": "ApiOutlined",
     "imports": [
       "index.html"
@@ -15,7 +15,7 @@
     "name": "data-utils"
   },
   "index.html": {
-    "file": "assets/index-C6j8aKrK.js",
+    "file": "assets/index-D2Tfq_0L.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -39,11 +39,11 @@
       "src/components/WizardPage.vue"
     ],
     "css": [
-      "assets/index-CM7E5kHi.css"
+      "assets/index-Cg93hvRV.css"
     ]
   },
   "src/components/AnalyticsPage.vue": {
-    "file": "assets/AnalyticsPage-CWYoxFVH.js",
+    "file": "assets/AnalyticsPage-D9C4Mbpl.js",
     "name": "AnalyticsPage",
     "src": "src/components/AnalyticsPage.vue",
     "isDynamicEntry": true,
@@ -54,7 +54,7 @@
     ]
   },
   "src/components/ApprovalsPage.vue": {
-    "file": "assets/ApprovalsPage-CDvCZraK.js",
+    "file": "assets/ApprovalsPage-BHY48rHe.js",
     "name": "ApprovalsPage",
     "src": "src/components/ApprovalsPage.vue",
     "isDynamicEntry": true,
@@ -65,7 +65,7 @@
     ]
   },
   "src/components/ChannelsPage.vue": {
-    "file": "assets/ChannelsPage-DigtGtyD.js",
+    "file": "assets/ChannelsPage-DAU6DyNF.js",
     "name": "ChannelsPage",
     "src": "src/components/ChannelsPage.vue",
     "isDynamicEntry": true,
@@ -75,7 +75,7 @@
     ]
   },
   "src/components/ChatPage.vue": {
-    "file": "assets/ChatPage-mkuxTPJF.js",
+    "file": "assets/ChatPage-bnaUyoGF.js",
     "name": "ChatPage",
     "src": "src/components/ChatPage.vue",
     "isDynamicEntry": true,
@@ -86,7 +86,7 @@
     ]
   },
   "src/components/CommsPage.vue": {
-    "file": "assets/CommsPage-KXMXqw3Y.js",
+    "file": "assets/CommsPage-WFpNVRnL.js",
     "name": "CommsPage",
     "src": "src/components/CommsPage.vue",
     "isDynamicEntry": true,
@@ -97,7 +97,7 @@
     ]
   },
   "src/components/HandsPage.vue": {
-    "file": "assets/HandsPage-Q29rl11J.js",
+    "file": "assets/HandsPage-Bt5SlbgA.js",
     "name": "HandsPage",
     "src": "src/components/HandsPage.vue",
     "isDynamicEntry": true,
@@ -108,7 +108,7 @@
     ]
   },
   "src/components/LogsPage.vue": {
-    "file": "assets/LogsPage-Dvw0HJky.js",
+    "file": "assets/LogsPage-AiPQ8yY8.js",
     "name": "LogsPage",
     "src": "src/components/LogsPage.vue",
     "isDynamicEntry": true,
@@ -119,18 +119,18 @@
     ]
   },
   "src/components/ModelsPage.vue": {
-    "file": "assets/ModelsPage-CSeJ3jqK.js",
+    "file": "assets/ModelsPage-Bj_pQZ1A.js",
     "name": "ModelsPage",
     "src": "src/components/ModelsPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "_api-DsCX2ZF1.js",
       "index.html",
-      "_ApiOutlined-BUf9OTx_.js"
+      "_ApiOutlined-DlPrMar-.js"
     ]
   },
   "src/components/OverviewPage.vue": {
-    "file": "assets/OverviewPage-CLjDadG4.js",
+    "file": "assets/OverviewPage-DLNCdET4.js",
     "name": "OverviewPage",
     "src": "src/components/OverviewPage.vue",
     "isDynamicEntry": true,
@@ -141,18 +141,18 @@
     ]
   },
   "src/components/ProvidersPage.vue": {
-    "file": "assets/ProvidersPage-C9kazqGO.js",
+    "file": "assets/ProvidersPage-Pj-xYDEz.js",
     "name": "ProvidersPage",
     "src": "src/components/ProvidersPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "_api-DsCX2ZF1.js",
       "index.html",
-      "_ApiOutlined-BUf9OTx_.js"
+      "_ApiOutlined-DlPrMar-.js"
     ]
   },
   "src/components/RuntimePage.vue": {
-    "file": "assets/RuntimePage-D595M09N.js",
+    "file": "assets/RuntimePage-BVdBX-Fo.js",
     "name": "RuntimePage",
     "src": "src/components/RuntimePage.vue",
     "isDynamicEntry": true,
@@ -163,7 +163,7 @@
     ]
   },
   "src/components/SchedulerPage.vue": {
-    "file": "assets/SchedulerPage-DTuiplFU.js",
+    "file": "assets/SchedulerPage-B1s4_pT_.js",
     "name": "SchedulerPage",
     "src": "src/components/SchedulerPage.vue",
     "isDynamicEntry": true,
@@ -174,7 +174,7 @@
     ]
   },
   "src/components/SessionsPage.vue": {
-    "file": "assets/SessionsPage-CV-JViSt.js",
+    "file": "assets/SessionsPage-lwleIzC9.js",
     "name": "SessionsPage",
     "src": "src/components/SessionsPage.vue",
     "isDynamicEntry": true,
@@ -184,7 +184,7 @@
     ]
   },
   "src/components/SettingsPage.vue": {
-    "file": "assets/SettingsPage-BkqUF8KX.js",
+    "file": "assets/SettingsPage-A-VkUnWc.js",
     "name": "SettingsPage",
     "src": "src/components/SettingsPage.vue",
     "isDynamicEntry": true,
@@ -195,7 +195,7 @@
     ]
   },
   "src/components/SkillsPage.vue": {
-    "file": "assets/SkillsPage-DxqviTtI.js",
+    "file": "assets/SkillsPage-k5rud65i.js",
     "name": "SkillsPage",
     "src": "src/components/SkillsPage.vue",
     "isDynamicEntry": true,
@@ -205,7 +205,7 @@
     ]
   },
   "src/components/WizardPage.vue": {
-    "file": "assets/WizardPage-CPk4bTDz.js",
+    "file": "assets/WizardPage-oNT9Kb-I.js",
     "name": "WizardPage",
     "src": "src/components/WizardPage.vue",
     "isDynamicEntry": true,
@@ -216,7 +216,7 @@
     ]
   },
   "src/components/WorkflowsPage.vue": {
-    "file": "assets/WorkflowsPage-CYH63_q-.js",
+    "file": "assets/WorkflowsPage-DrQEP-ad.js",
     "name": "WorkflowsPage",
     "src": "src/components/WorkflowsPage.vue",
     "isDynamicEntry": true,

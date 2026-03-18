@@ -839,74 +839,74 @@ fn init_tracing_file() {
 
 /// Redirect tracing to daemon.log for persistent logging.
 fn init_tracing_daemon_file() {
+    use tracing_subscriber::fmt::writer::MakeWriterExt;
+
     let log_dir = cli_openfang_home();
     let _ = std::fs::create_dir_all(&log_dir);
-    let log_path = log_dir.join("daemon.log");
 
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-    {
-        Ok(file) => {
-            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-            if use_local_log_time() {
-                tracing_subscriber::fmt()
-                    .with_env_filter(env_filter)
-                    .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
-                    .with_writer(std::sync::Mutex::new(file))
-                    .with_ansi(false)
-                    .init();
-            } else {
-                tracing_subscriber::fmt()
-                    .with_env_filter(env_filter)
-                    .with_writer(std::sync::Mutex::new(file))
-                    .with_ansi(false)
-                    .init();
-            }
-        }
-        Err(_) => {
-            // Fallback: log to stderr if file creation fails
-            init_tracing_stderr();
-        }
+    // Clean up old log files based on OPENFANG_LOG_RETENTION_DAYS
+    cleanup_old_logs(&log_dir);
+
+    // Use tracing_appender::rolling::daily for automatic daily rotation
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "daemon.log");
+
+    // Combine file and stdout writers
+    let combined_writer = file_appender.and(std::io::stdout);
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    if use_local_log_time() {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+            .with_writer(combined_writer)
+            .with_ansi(false) // Disable ANSI for file logs (affects both)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_writer(combined_writer)
+            .with_ansi(false)
+            .init();
     }
 }
 
-/// Redirect tracing to daemon.log for persistent logging of the daemon process.
-fn init_tracing_daemon_file() {
-    let log_dir = cli_openfang_home();
-    let _ = std::fs::create_dir_all(&log_dir);
-    let log_path = log_dir.join("daemon.log");
+/// Clean up log files older than the configured retention period.
+fn cleanup_old_logs(log_dir: &std::path::Path) {
+    let retention_days: u64 = std::env::var("OPENFANG_LOG_RETENTION_DAYS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7); // Default: keep 7 days
 
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-    {
-        Ok(file) => {
-            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-            if use_local_log_time() {
-                tracing_subscriber::fmt()
-                    .with_env_filter(env_filter)
-                    .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
-                    .with_writer(std::sync::Mutex::new(file))
-                    .with_ansi(false)
-                    .init();
-            } else {
-                tracing_subscriber::fmt()
-                    .with_env_filter(env_filter)
-                    .with_writer(std::sync::Mutex::new(file))
-                    .with_ansi(false)
-                    .init();
+    if retention_days == 0 {
+        return; // 0 means keep all logs
+    }
+
+    let cutoff_time = std::time::SystemTime::now()
+        - std::time::Duration::from_secs(retention_days * 24 * 60 * 60);
+
+    let entries = match std::fs::read_dir(log_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // Match log files with pattern: daemon.log.YYYY-MM-DD
+        if file_name.starts_with("daemon.log.") && file_name.len() == "daemon.log.YYYY-MM-DD".len() {
+            if let Ok(metadata) = entry.metadata() {
+                if let Ok(modified) = metadata.modified() {
+                    if modified < cutoff_time {
+                        let _ = std::fs::remove_file(&path);
+                    }
+                }
             }
-            eprintln!("Daemon logs: {}", log_path.display());
-        }
-        Err(e) => {
-            // Fallback to stderr if log file cannot be opened
-            eprintln!("Warning: Could not open daemon.log: {e}");
-            init_tracing_stderr();
         }
     }
 }
@@ -1562,7 +1562,7 @@ fn cmd_start(config: Option<PathBuf>) {
         ui::kv("Model", &model);
         ui::kv(
             "Logs",
-            &format!("{}/daemon.log", kernel.config.home_dir.display()),
+            &format!("{}/daemon.log.*", kernel.config.home_dir.display()),
         );
         ui::blank();
         ui::hint("Open the dashboard in your browser, or run `openfang chat`");

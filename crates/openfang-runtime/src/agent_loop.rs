@@ -1630,11 +1630,10 @@ pub async fn run_agent_loop_streaming(
                     };
 
                     // Notify client of tool execution result (detect dead consumer)
-                    let preview: String = final_content.chars().take(300).collect();
                     if stream_tx
                         .send(StreamEvent::ToolExecutionResult {
                             name: tool_call.name.clone(),
-                            result_preview: preview,
+                            result_preview: final_content.clone(),
                             is_error: result.is_error,
                         })
                         .await

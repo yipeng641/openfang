@@ -442,132 +442,101 @@ pub async fn get_agent_session(
 
             // Pass 1: build messages and a lookup from tool_use_id → (msg_idx, tool_idx)
             use base64::Engine as _;
-            let mut built_messages: Vec<serde_json::Value> = Vec::new();
-            let mut tool_use_index: std::collections::HashMap<String, (usize, usize)> =
-                std::collections::HashMap::new();
-
-            for m in &session.messages {
-                let mut tools: Vec<serde_json::Value> = Vec::new();
-                let mut msg_images: Vec<serde_json::Value> = Vec::new();
-                let content = match &m.content {
-                    openfang_types::message::MessageContent::Text(t) => t.clone(),
-                    openfang_types::message::MessageContent::Blocks(blocks) => {
-                        let mut texts = Vec::new();
-                        for b in blocks {
-                            match b {
-                                openfang_types::message::ContentBlock::Text { text, .. } => {
-                                    texts.push(text.clone());
-                                }
-                                openfang_types::message::ContentBlock::Image {
-                                    media_type,
-                                    data,
-                                } => {
-                                    texts.push("[Image]".to_string());
-                                    // Persist image to upload dir so it can be
-                                    // served back when loading session history.
-                                    let file_id = uuid::Uuid::new_v4().to_string();
-                                    let upload_dir = std::env::temp_dir().join("openfang_uploads");
-                                    let _ = std::fs::create_dir_all(&upload_dir);
-                                    if let Ok(bytes) =
-                                        base64::engine::general_purpose::STANDARD.decode(data)
-                                    {
-                                        let _ = std::fs::write(upload_dir.join(&file_id), &bytes);
-                                        UPLOAD_REGISTRY.insert(
-                                            file_id.clone(),
-                                            UploadMeta {
-                                                filename: format!(
-                                                    "image.{}",
-                                                    media_type.rsplit('/').next().unwrap_or("png")
-                                                ),
-                                                content_type: media_type.clone(),
-                                            },
-                                        );
-                                        msg_images.push(serde_json::json!({
-                                            "file_id": file_id,
-                                            "filename": format!("image.{}", media_type.rsplit('/').next().unwrap_or("png")),
-                                        }));
+            let messages: Vec<serde_json::Value> = session
+                .messages
+                .iter()
+                .filter_map(|m| {
+                    let mut tools: Vec<serde_json::Value> = Vec::new();
+                    let mut msg_images: Vec<serde_json::Value> = Vec::new();
+                    let content = match &m.content {
+                        openfang_types::message::MessageContent::Text(t) => t.clone(),
+                        openfang_types::message::MessageContent::Blocks(blocks) => {
+                            let mut texts = Vec::new();
+                            for b in blocks {
+                                match b {
+                                    openfang_types::message::ContentBlock::Text { text, .. } => {
+                                        texts.push(text.clone());
                                     }
-                                }
-                                openfang_types::message::ContentBlock::ToolUse {
-                                    id,
-                                    name,
-                                    input,
-                                    ..
-                                } => {
-                                    let tool_idx = tools.len();
-                                    tools.push(serde_json::json!({
-                                        "name": name,
-                                        "input": input,
-                                        "running": false,
-                                        "expanded": false,
-                                    }));
-                                    // Will be filled after this loop when we know msg_idx
-                                    tool_use_index.insert(id.clone(), (usize::MAX, tool_idx));
-                                }
-                                // ToolResult blocks are handled in pass 2
-                                openfang_types::message::ContentBlock::ToolResult { .. } => {}
-                                _ => {}
-                            }
-                        }
-                        texts.join("\n")
-                    }
-                };
-                // Skip messages that are purely tool results (User role with only ToolResult blocks)
-                if content.is_empty() && tools.is_empty() {
-                    continue;
-                }
-                let msg_idx = built_messages.len();
-                // Fix up the msg_idx for tool_use entries registered with sentinel
-                for (_, (mi, _)) in tool_use_index.iter_mut() {
-                    if *mi == usize::MAX {
-                        *mi = msg_idx;
-                    }
-                }
-                let mut msg = serde_json::json!({
-                    "role": format!("{:?}", m.role),
-                    "content": content,
-                });
-                if !tools.is_empty() {
-                    msg["tools"] = serde_json::Value::Array(tools);
-                }
-                if !msg_images.is_empty() {
-                    msg["images"] = serde_json::Value::Array(msg_images);
-                }
-                built_messages.push(msg);
-            }
-
-            // Pass 2: walk messages again and attach ToolResult to the correct tool
-            for m in &session.messages {
-                if let openfang_types::message::MessageContent::Blocks(blocks) = &m.content {
-                    for b in blocks {
-                        if let openfang_types::message::ContentBlock::ToolResult {
-                            tool_use_id,
-                            content: result,
-                            is_error,
-                            ..
-                        } = b
-                        {
-                            if let Some(&(msg_idx, tool_idx)) = tool_use_index.get(tool_use_id) {
-                                if let Some(msg) = built_messages.get_mut(msg_idx) {
-                                    if let Some(tools_arr) =
-                                        msg.get_mut("tools").and_then(|v| v.as_array_mut())
-                                    {
-                                        if let Some(tool_obj) = tools_arr.get_mut(tool_idx) {
-                                            let preview: String =
-                                                result.chars().take(2000).collect();
-                                            tool_obj["result"] = serde_json::Value::String(preview);
-                                            tool_obj["is_error"] =
-                                                serde_json::Value::Bool(*is_error);
+                                    openfang_types::message::ContentBlock::Image {
+                                        media_type,
+                                        data,
+                                    } => {
+                                        texts.push("[Image]".to_string());
+                                        // Persist image to upload dir so it can be
+                                        // served back when loading session history.
+                                        let file_id = uuid::Uuid::new_v4().to_string();
+                                        let upload_dir = std::env::temp_dir().join("openfang_uploads");
+                                        let _ = std::fs::create_dir_all(&upload_dir);
+                                        if let Ok(bytes) =
+                                            base64::engine::general_purpose::STANDARD.decode(data)
+                                        {
+                                            let _ = std::fs::write(upload_dir.join(&file_id), &bytes);
+                                            UPLOAD_REGISTRY.insert(
+                                                file_id.clone(),
+                                                UploadMeta {
+                                                    filename: format!(
+                                                        "image.{}",
+                                                        media_type.rsplit('/').next().unwrap_or("png")
+                                                    ),
+                                                    content_type: media_type.clone(),
+                                                },
+                                            );
+                                            msg_images.push(serde_json::json!({
+                                                "file_id": file_id,
+                                                "filename": format!("image.{}", media_type.rsplit('/').next().unwrap_or("png")),
+                                            }));
                                         }
                                     }
+                                    openfang_types::message::ContentBlock::ToolUse {
+                                        id,
+                                        name,
+                                        input,
+                                        ..
+                                    } => {
+                                        tools.push(serde_json::json!({
+                                            "tool_use_id": id,
+                                            "name": name,
+                                            "input": input,
+                                            "running": false,
+                                            "expanded": false,
+                                        }));
+                                    }
+                                    openfang_types::message::ContentBlock::ToolResult {
+                                        tool_use_id,
+                                        tool_name,
+                                        content: result,
+                                        is_error,
+                                    } => {
+                                        tools.push(serde_json::json!({
+                                            "tool_use_id": tool_use_id,
+                                            "name": if tool_name.is_empty() { tool_use_id.clone() } else { tool_name.clone() },
+                                            "result": result,
+                                            "is_error": is_error,
+                                            "expanded": false,
+                                        }));
+                                    }
+                                    _ => {}
                                 }
                             }
+                            texts.join("\n")
                         }
+                    };
+                    if content.is_empty() && tools.is_empty() && msg_images.is_empty() {
+                        return None;
                     }
-                }
-            }
-
-            let messages = built_messages;
+                    let mut msg = serde_json::json!({
+                        "role": format!("{:?}", m.role).to_lowercase(),
+                        "content": content,
+                    });
+                    if !tools.is_empty() {
+                        msg["tools"] = serde_json::Value::Array(tools);
+                    }
+                    if !msg_images.is_empty() {
+                        msg["images"] = serde_json::Value::Array(msg_images);
+                    }
+                    Some(msg)
+                })
+                .collect();
             (
                 StatusCode::OK,
                 Json(serde_json::json!({

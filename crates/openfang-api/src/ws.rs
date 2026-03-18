@@ -991,11 +991,8 @@ fn map_stream_event(event: &StreamEvent, verbose: VerboseLevel) -> Option<serde_
                 }))
             }
             VerboseLevel::Full => {
-                let input_preview: String = serde_json::to_string(input)
-                    .unwrap_or_default()
-                    .chars()
-                    .take(500)
-                    .collect();
+                let input_preview =
+                    serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
                 Some(serde_json::json!({
                     "type": "tool_end",
                     "tool": name,
